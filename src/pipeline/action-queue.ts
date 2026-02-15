@@ -11,7 +11,7 @@ import type {
 } from '../types/index.js';
 const VALID_ACTION_TYPES: ReadonlySet<string> = new Set<ActionType>([
   'move', 'gather', 'craft', 'attack', 'talk', 'inspect',
-  'trade', 'plant', 'water', 'feed', 'climb',
+  'trade', 'trade_respond', 'plant', 'water', 'feed', 'climb',
   'form_alliance', 'join_alliance', 'idle',
 ]);
 
@@ -74,6 +74,8 @@ export class ActionQueue {
         return this.parseInspectParams(raw);
       case 'trade':
         return this.parseTradeParams(raw);
+      case 'trade_respond':
+        return this.parseTradeRespondParams(raw);
       case 'plant':
         return this.parsePlantParams(raw);
       case 'water':
@@ -154,6 +156,12 @@ export class ActionQueue {
       result.push({ itemId: obj.itemId, quantity });
     }
     return result;
+  }
+
+  private parseTradeRespondParams(raw: Record<string, unknown>): ActionParams | null {
+    if (typeof raw.tradeId !== 'string' || raw.tradeId === '') return null;
+    if (typeof raw.accept !== 'boolean') return null;
+    return { type: 'trade_respond', tradeId: raw.tradeId, accept: raw.accept };
   }
 
   private parsePlantParams(raw: Record<string, unknown>): ActionParams | null {

@@ -10,6 +10,7 @@ export type ActionType =
   | 'talk'
   | 'inspect'
   | 'trade'
+  | 'trade_respond'
   | 'plant'
   | 'water'
   | 'feed'
@@ -40,6 +41,7 @@ export type ActionParams =
   | { type: 'talk'; mode: 'whisper' | 'local' | 'broadcast'; message: string; targetId?: EntityId }
   | { type: 'inspect'; targetId: EntityId }
   | { type: 'trade'; targetAgentId: EntityId; offer: TradeItem[]; request: TradeItem[] }
+  | { type: 'trade_respond'; tradeId: string; accept: boolean }
   | { type: 'plant'; seedId: string; x: number; y: number }
   | { type: 'water'; x: number; y: number }
   | { type: 'feed'; behemothId: EntityId; itemId: string }

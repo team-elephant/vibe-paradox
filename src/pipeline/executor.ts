@@ -10,11 +10,24 @@ import type {
   CombatPair,
   StateChange,
   SpawnEvent,
+  Trade,
+  CraftingJob,
 } from '../types/index.js';
 import { distance } from '../types/index.js';
 import type { WorldState } from '../server/world.js';
 import { SPAWN_POINT, WORLD_SIZE } from '../shared/constants.js';
-import { generateMessageId } from '../shared/utils.js';
+import { generateMessageId, generateTradeId, generateCraftJobId } from '../shared/utils.js';
+import { getRecipe } from '../data/recipes.js';
+import {
+  EconomyProcessor,
+  addItemToInventory,
+  removeItemFromInventory,
+} from './economy-processor.js';
+import type {
+  ProcessTradesResult,
+  ProcessCraftingResult,
+  TradeResolveResult,
+} from './economy-processor.js';
 
 export interface ExecutionResult {
   stateChanges: StateChange[];
@@ -29,6 +42,7 @@ interface SingleExecutionResult {
 export class ActionExecutor {
   /** Active combat pairs tracked across ticks */
   readonly combatPairs: CombatPair[] = [];
+  private readonly economyProcessor = new EconomyProcessor();
 
   executeBatch(
     actions: ValidatedAction[],
@@ -69,6 +83,110 @@ export class ActionExecutor {
     }
   }
 
+  /**
+   * Apply trade expiry results from EconomyProcessor.processTrades().
+   * Only executor mutates WorldState.
+   */
+  applyTradeExpiry(result: ProcessTradesResult, world: WorldState): void {
+    for (const expiry of result.expired) {
+      const trade = world.pendingTrades.get(expiry.tradeId);
+      if (trade) {
+        trade.status = 'expired';
+        trade.resolvedAt = expiry.resolvedAt;
+        world.pendingTrades.delete(expiry.tradeId);
+      }
+    }
+  }
+
+  /**
+   * Apply crafting completion results from EconomyProcessor.processCrafting().
+   * Only executor mutates WorldState.
+   */
+  applyCraftCompletion(result: ProcessCraftingResult, world: WorldState): void {
+    // Remove orphaned/invalid jobs
+    for (const jobId of result.removedJobIds) {
+      world.craftingQueue.delete(jobId);
+    }
+
+    // Apply completed crafting jobs
+    for (const completion of result.completed) {
+      const agent = world.agents.get(completion.agentId);
+      if (!agent) continue;
+
+      addItemToInventory(agent.inventory, completion.outputItemId, completion.outputQty);
+
+      if (agent.status === 'crafting') {
+        agent.status = 'idle';
+      }
+
+      const job = world.craftingQueue.get(completion.jobId);
+      if (job) {
+        job.status = 'completed';
+      }
+      world.craftingQueue.delete(completion.jobId);
+
+      world.tickEvents.push(completion.event);
+    }
+  }
+
+  /**
+   * Apply trade resolution result from EconomyProcessor.resolveTrade().
+   * Only executor mutates WorldState.
+   */
+  applyTradeResolve(result: TradeResolveResult, world: WorldState): void {
+    if (!result) return;
+
+    if (!result.accepted) {
+      const trade = world.pendingTrades.get(result.tradeId);
+      if (trade) {
+        trade.status = 'rejected';
+        trade.resolvedAt = result.resolvedAt;
+        world.pendingTrades.delete(result.tradeId);
+      }
+      return;
+    }
+
+    // Accepted trade — swap items and gold
+    const buyer = world.agents.get(result.buyerId);
+    const seller = world.agents.get(result.sellerId);
+    if (!buyer || !seller) return;
+
+    // Buyer's offered items go to seller
+    for (const item of result.offered) {
+      if (item.itemId === 'gold') {
+        buyer.gold -= item.quantity;
+        seller.gold += item.quantity;
+      } else {
+        removeItemFromInventory(buyer.inventory, item.itemId, item.quantity);
+        addItemToInventory(seller.inventory, item.itemId, item.quantity);
+      }
+    }
+
+    // Seller's requested items go to buyer
+    for (const item of result.requested) {
+      if (item.itemId === 'gold') {
+        seller.gold -= item.quantity;
+        buyer.gold += item.quantity;
+      } else {
+        removeItemFromInventory(seller.inventory, item.itemId, item.quantity);
+        addItemToInventory(buyer.inventory, item.itemId, item.quantity);
+      }
+    }
+
+    const trade = world.pendingTrades.get(result.tradeId);
+    if (trade) {
+      trade.status = 'accepted';
+      trade.resolvedAt = result.resolvedAt;
+    }
+    world.pendingTrades.delete(result.tradeId);
+
+    // Reset statuses if trading
+    if (buyer.status === 'trading') buyer.status = 'idle';
+    if (seller.status === 'trading') seller.status = 'idle';
+
+    world.tickEvents.push(result.event);
+  }
+
   private executeSingle(
     action: ValidatedAction,
     world: WorldState,
@@ -86,10 +204,16 @@ export class ActionExecutor {
         return this.executeAttack(action.params, agent, world, tick);
       case 'talk':
         return this.executeTalk(action.params, agent, world, tick);
+      case 'trade':
+        return this.executeTrade(action.params, agent, world, tick);
+      case 'craft':
+        return this.executeCraft(action.params, agent, world, tick);
+      case 'trade_respond':
+        return this.executeTradeRespond(action.params, agent, world, tick);
       case 'idle':
         return this.executeIdle(agent);
       default:
-        // Other actions (craft, trade, plant, water, feed, climb,
+        // Other actions (plant, water, feed, climb,
         // form_alliance, join_alliance, inspect) are handled by
         // their respective Phase 3 processors.
         return { changes: [], spawns: [] };
@@ -225,6 +349,115 @@ export class ActionExecutor {
 
     world.tickMessages.push(msg);
 
+    return { changes: [], spawns: [] };
+  }
+
+  private executeTrade(
+    params: Extract<ActionParams, { type: 'trade' }>,
+    agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    const changes: StateChange[] = [];
+
+    // Create pending trade
+    const trade: Trade = {
+      id: generateTradeId(),
+      tick,
+      buyerId: agent.id,
+      sellerId: params.targetAgentId,
+      offered: params.offer,
+      requested: params.request,
+      status: 'pending',
+      createdAt: tick,
+      resolvedAt: null,
+    };
+
+    world.pendingTrades.set(trade.id, trade);
+
+    const oldStatus = agent.status;
+    agent.status = 'trading';
+
+    changes.push({
+      entityId: agent.id,
+      field: 'status',
+      oldValue: oldStatus,
+      newValue: 'trading',
+    });
+
+    // Emit trade_proposed event so seller can discover the trade
+    world.tickEvents.push({
+      type: 'trade_proposed',
+      tradeId: trade.id,
+      buyer: agent.id,
+      seller: params.targetAgentId,
+      offered: params.offer,
+      requested: params.request,
+    });
+
+    return { changes, spawns: [] };
+  }
+
+  private executeCraft(
+    params: Extract<ActionParams, { type: 'craft' }>,
+    agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    const changes: StateChange[] = [];
+
+    const recipe = getRecipe(params.recipeId);
+    if (!recipe) return { changes: [], spawns: [] };
+
+    // Verify ALL ingredients exist BEFORE removing any (atomic check)
+    for (const ingredient of recipe.ingredients) {
+      const inv = agent.inventory.find((i) => i.id === ingredient.itemId);
+      if (!inv || inv.quantity < ingredient.qty) {
+        // Shouldn't happen since validator checked, but safety check
+        return { changes: [], spawns: [] };
+      }
+    }
+
+    // All ingredients verified — now consume them
+    for (const ingredient of recipe.ingredients) {
+      removeItemFromInventory(agent.inventory, ingredient.itemId, ingredient.qty);
+    }
+
+    // Create crafting job
+    const job: CraftingJob = {
+      id: generateCraftJobId(),
+      agentId: agent.id,
+      recipeId: params.recipeId,
+      startTick: tick,
+      completeTick: tick + recipe.craftTicks,
+      status: 'in_progress',
+    };
+
+    world.craftingQueue.set(job.id, job);
+
+    const oldStatus = agent.status;
+    agent.status = 'crafting';
+
+    changes.push({
+      entityId: agent.id,
+      field: 'status',
+      oldValue: oldStatus,
+      newValue: 'crafting',
+    });
+
+    return { changes, spawns: [] };
+  }
+
+  private executeTradeRespond(
+    params: Extract<ActionParams, { type: 'trade_respond' }>,
+    _agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    // Get result from EconomyProcessor (read-only evaluation)
+    const result = this.economyProcessor.resolveTrade(params.tradeId, params.accept, world, tick);
+    // Apply mutations here in the executor
+    this.applyTradeResolve(result, world);
     return { changes: [], spawns: [] };
   }
 
