@@ -16,6 +16,7 @@ import {
   CLIMB_RANGE,
   WORLD_SIZE,
 } from '../shared/constants.js';
+import { getRecipe } from '../data/recipes.js';
 
 export class ActionValidator {
   validateBatch(
@@ -60,6 +61,8 @@ export class ActionValidator {
         return this.validateTalk(action, agent, world);
       case 'trade':
         return this.validateTrade(action, agent, world);
+      case 'trade_respond':
+        return this.validateTradeRespond(action, agent, world);
       case 'plant':
         return this.validatePlant(action, agent, world);
       case 'water':
@@ -177,11 +180,21 @@ export class ActionValidator {
     _world: WorldState,
   ): ValidatedAction | RejectedAction {
     if (agent.role !== 'merchant') return this.reject(action, 'Only merchants can craft');
+    if (agent.status === 'crafting') return this.reject(action, 'Already crafting');
 
-    // Recipe and ingredient checks are deferred to executor/economy-processor
-    // since we don't have recipe data in scope here. The validator checks role only.
     const params = action.params as Extract<ActionParams, { type: 'craft' }>;
     if (!params.recipeId) return this.reject(action, 'Recipe ID required');
+
+    const recipe = getRecipe(params.recipeId);
+    if (!recipe) return this.reject(action, 'Recipe not found');
+
+    // Check agent has all ingredients
+    for (const ingredient of recipe.ingredients) {
+      const inv = agent.inventory.find((i) => i.id === ingredient.itemId);
+      if (!inv || inv.quantity < ingredient.qty) {
+        return this.reject(action, `Insufficient materials: need ${ingredient.qty} ${ingredient.itemId}`);
+      }
+    }
 
     return this.approve(action);
   }
@@ -211,6 +224,8 @@ export class ActionValidator {
     agent: Agent,
     world: WorldState,
   ): ValidatedAction | RejectedAction {
+    if (agent.role === 'monster') return this.reject(action, 'Monsters cannot trade');
+
     const params = action.params as Extract<ActionParams, { type: 'trade' }>;
 
     if (params.targetAgentId === action.agentId) return this.reject(action, 'Cannot trade with yourself');
@@ -225,11 +240,59 @@ export class ActionValidator {
       return this.reject(action, 'Trade must include offer or request');
     }
 
-    // Check agent has offered items
+    // Check agent has offered items/gold
     for (const item of params.offer) {
-      const inv = agent.inventory.find((i) => i.id === item.itemId);
-      if (!inv || inv.quantity < item.quantity) {
-        return this.reject(action, 'Insufficient items for trade offer');
+      if (item.itemId === 'gold') {
+        if (agent.gold < item.quantity) {
+          return this.reject(action, 'Insufficient gold for trade offer');
+        }
+      } else {
+        const inv = agent.inventory.find((i) => i.id === item.itemId);
+        if (!inv || inv.quantity < item.quantity) {
+          return this.reject(action, 'Insufficient items for trade offer');
+        }
+      }
+    }
+
+    return this.approve(action);
+  }
+
+  private validateTradeRespond(
+    action: AgentAction,
+    agent: Agent,
+    world: WorldState,
+  ): ValidatedAction | RejectedAction {
+    const params = action.params as Extract<ActionParams, { type: 'trade_respond' }>;
+
+    const trade = world.pendingTrades.get(params.tradeId);
+    if (!trade) return this.reject(action, 'Trade not found');
+    if (trade.status !== 'pending') return this.reject(action, 'Trade is no longer pending');
+
+    // Only the seller (trade target) can respond to the trade
+    if (trade.sellerId !== action.agentId) {
+      return this.reject(action, 'Only the trade recipient can respond');
+    }
+
+    // If accepting, verify seller has requested items
+    if (params.accept) {
+      for (const item of trade.requested) {
+        if (item.itemId === 'gold') {
+          if (agent.gold < item.quantity) {
+            return this.reject(action, 'Insufficient gold to accept trade');
+          }
+        } else {
+          const inv = agent.inventory.find((i) => i.id === item.itemId);
+          if (!inv || inv.quantity < item.quantity) {
+            return this.reject(action, 'Insufficient items to accept trade');
+          }
+        }
+      }
+
+      // Check both agents are still in range
+      const buyer = world.agents.get(trade.buyerId);
+      if (!buyer) return this.reject(action, 'Trade partner no longer exists');
+      if (distance(agent.position, buyer.position) > TRADE_RANGE) {
+        return this.reject(action, 'Too far from trade partner');
       }
     }
 

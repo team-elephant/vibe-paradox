@@ -408,6 +408,8 @@ describe('ActionValidator', () => {
 
   it('merchant craft → approved', () => {
     const merchant = makeAgent({ id: 'agent_m', role: 'merchant' });
+    merchant.inventory.push({ id: 'iron_ore', quantity: 3 });
+    merchant.inventory.push({ id: 'log', quantity: 1 });
     world.addAgent(merchant);
 
     const action = makeAction('agent_m', { type: 'craft', recipeId: 'iron_sword' });

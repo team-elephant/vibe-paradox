@@ -10,6 +10,7 @@ import type { CombatResolver } from '../pipeline/combat-resolver.js';
 import type { ResourceProcessor } from '../pipeline/resource-processor.js';
 import type { StateBroadcaster } from './broadcaster.js';
 import type { GameWebSocketServer } from './ws-server.js';
+import type { EconomyProcessor } from '../pipeline/economy-processor.js';
 import { TICK_RATE_MS, SNAPSHOT_INTERVAL_TICKS } from '../shared/constants.js';
 
 export class TickLoop {
@@ -20,6 +21,7 @@ export class TickLoop {
   private combatResolver: CombatResolver | null = null;
   private db: Database;
   private resourceProcessor: ResourceProcessor | null = null;
+  private economyProcessor: EconomyProcessor | null = null;
   private broadcaster: StateBroadcaster | null = null;
   private wsServer: GameWebSocketServer | null = null;
 
@@ -45,6 +47,10 @@ export class TickLoop {
 
   setResourceProcessor(rp: ResourceProcessor): void {
     this.resourceProcessor = rp;
+  }
+
+  setEconomyProcessor(economyProcessor: EconomyProcessor): void {
+    this.economyProcessor = economyProcessor;
   }
 
   setBroadcaster(broadcaster: StateBroadcaster, wsServer: GameWebSocketServer): void {
@@ -97,6 +103,16 @@ export class TickLoop {
 
     // 8. Process behemoth lifecycle (Phase 3 — placeholder)
     // this.behemothProcessor.tick(this.world, tick);
+
+    // 8.5. Process economy (trades expiry + crafting completion)
+    // EconomyProcessor returns result objects; executor applies mutations.
+    if (this.economyProcessor) {
+      const tradeResults = this.economyProcessor.processTrades(this.world, tick);
+      this.executor.applyTradeExpiry(tradeResults, this.world);
+
+      const craftResults = this.economyProcessor.processCrafting(this.world, tick);
+      this.executor.applyCraftCompletion(craftResults, this.world);
+    }
 
     // 9. Check respawns
     this.executor.processRespawns(this.world, tick);

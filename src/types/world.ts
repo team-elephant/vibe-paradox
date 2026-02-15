@@ -15,6 +15,7 @@ export type WorldEvent =
   | { type: 'tree_grown'; position: Position }
   | { type: 'behemoth_knockout'; behemothId: EntityId; attackers: EntityId[] }
   | { type: 'behemoth_wake'; behemothId: EntityId; thrownOff: EntityId[] }
+  | { type: 'trade_proposed'; tradeId: string; buyer: EntityId; seller: EntityId; offered: TradeItem[]; requested: TradeItem[] }
   | { type: 'trade_complete'; buyer: EntityId; seller: EntityId; offered: TradeItem[]; received: TradeItem[] }
   | { type: 'craft_complete'; agentId: EntityId; recipeId: string; item: string }
   | { type: 'alliance_formed'; name: string; founder: EntityId }

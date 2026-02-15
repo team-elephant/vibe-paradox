@@ -45,6 +45,10 @@ export function generateAllianceId(): string {
   return `ally_${nanoid(8)}`;
 }
 
+export function generateCraftJobId(): string {
+  return `craft_${nanoid(8)}`;
+}
+
 export function nowISO(): string {
   return new Date().toISOString();
 }

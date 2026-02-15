@@ -13,7 +13,7 @@
 
 ## Phase 1: Foundation
 
-### TASK-001: Project Scaffold `[ ]`
+### TASK-001: Project Scaffold `[x]`
 **Depends on:** Nothing
 **Parallel-safe with:** Nothing (must go first)
 
@@ -49,7 +49,7 @@ tests/.gitkeep
 
 ---
 
-### TASK-002: Type System `[ ]`
+### TASK-002: Type System `[x]`
 **Depends on:** TASK-001
 **Parallel-safe with:** Nothing (everything depends on this)
 
@@ -90,7 +90,7 @@ src/shared/utils.ts
 
 ---
 
-### TASK-003: SQLite Layer `[ ]`
+### TASK-003: SQLite Layer `[x]`
 **Depends on:** TASK-001, TASK-002
 **Parallel-safe with:** TASK-004 (if 002 is done)
 
@@ -184,7 +184,7 @@ tests/world.test.ts
 
 ---
 
-### TASK-005: World Generation (Seed) `[ ]`
+### TASK-005: World Generation (Seed) `[x]`
 **Depends on:** TASK-002, TASK-004
 **Parallel-safe with:** TASK-003, TASK-006
 
@@ -228,7 +228,7 @@ tests/rng.test.ts
 
 ---
 
-### TASK-006: Action Queue + Validator `[ ]`
+### TASK-006: Action Queue + Validator `[x]`
 **Depends on:** TASK-002
 **Parallel-safe with:** TASK-004, TASK-005
 
@@ -278,7 +278,7 @@ tests/validator.test.ts
 
 ---
 
-### TASK-007: Executor (Core) `[ ]`
+### TASK-007: Executor (Core) `[x]`
 **Depends on:** TASK-002, TASK-004, TASK-006
 **Parallel-safe with:** TASK-003, TASK-005
 
@@ -316,7 +316,7 @@ tests/executor.test.ts
 
 ---
 
-### TASK-008: Tick Loop `[ ]`
+### TASK-008: Tick Loop `[x]`
 **Depends on:** TASK-003, TASK-004, TASK-006, TASK-007
 **Parallel-safe with:** Nothing (this wires everything together)
 
