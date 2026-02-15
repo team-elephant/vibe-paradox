@@ -72,6 +72,8 @@ export class ActionValidator {
         return this.validateFormAlliance(action, agent, world);
       case 'join_alliance':
         return this.validateJoinAlliance(action, agent, world);
+      case 'leave_alliance':
+        return this.validateLeaveAlliance(action, agent, world);
       case 'inspect':
         return this.approve(action);
       case 'idle':
@@ -355,6 +357,18 @@ export class ActionValidator {
     // Check agent not already in an alliance
     if (agent.alliance !== null) {
       return this.reject(action, 'Already in an alliance');
+    }
+
+    return this.approve(action);
+  }
+
+  private validateLeaveAlliance(
+    action: AgentAction,
+    agent: Agent,
+    _world: WorldState,
+  ): ValidatedAction | RejectedAction {
+    if (agent.alliance === null) {
+      return this.reject(action, 'Not in an alliance');
     }
 
     return this.approve(action);

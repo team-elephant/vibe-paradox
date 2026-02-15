@@ -16,6 +16,7 @@ export type ActionType =
   | 'climb'
   | 'form_alliance'
   | 'join_alliance'
+  | 'leave_alliance'
   | 'idle';
 
 export interface RawAction {
@@ -46,6 +47,7 @@ export type ActionParams =
   | { type: 'climb'; behemothId: EntityId }
   | { type: 'form_alliance'; name: string }
   | { type: 'join_alliance'; name: string }
+  | { type: 'leave_alliance' }
   | { type: 'idle' };
 
 export interface TradeItem {
