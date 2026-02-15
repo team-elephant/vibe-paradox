@@ -15,6 +15,7 @@ import { distance } from '../types/index.js';
 import type { WorldState } from '../server/world.js';
 import { SPAWN_POINT, WORLD_SIZE } from '../shared/constants.js';
 import { generateMessageId } from '../shared/utils.js';
+import { ChatProcessor } from './chat-processor.js';
 
 export interface ExecutionResult {
   stateChanges: StateChange[];
@@ -29,6 +30,7 @@ interface SingleExecutionResult {
 export class ActionExecutor {
   /** Active combat pairs tracked across ticks */
   readonly combatPairs: CombatPair[] = [];
+  private readonly chatProcessor = new ChatProcessor();
 
   executeBatch(
     actions: ValidatedAction[],
@@ -209,19 +211,11 @@ export class ActionExecutor {
       content: params.message,
       targetId: params.targetId ?? null,
       position: { ...agent.position },
-      recipients: [], // Will be set by chat processor or broadcaster
+      recipients: [],
     };
 
-    // Basic recipient logic (chat processor in Phase 3 will refine this)
-    if (params.mode === 'broadcast') {
-      msg.recipients = 'all';
-    } else if (params.mode === 'whisper' && params.targetId) {
-      msg.recipients = [agent.id, params.targetId];
-    } else {
-      // Local: recipients will be determined by chat processor
-      // For now just add to tick messages
-      msg.recipients = [];
-    }
+    // ChatProcessor sets recipients based on mode (whisper/local/broadcast)
+    this.chatProcessor.processMessage(msg, world);
 
     world.tickMessages.push(msg);
 
