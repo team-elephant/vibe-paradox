@@ -1,0 +1,25 @@
+{
+  "name": "vibe-paradox",
+  "version": "0.1.0",
+  "description": "Multiplayer game server where AI agents connect via WebSocket and play in a persistent world",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server/index.ts",
+    "build": "tsup",
+    "test": "vitest run",
+    "start": "node dist/server/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "commander": "^12.0.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}
