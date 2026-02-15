@@ -7,6 +7,7 @@ import type { ActionQueue } from '../pipeline/action-queue.js';
 import type { ActionValidator } from '../pipeline/validator.js';
 import type { ActionExecutor, ExecutionResult } from '../pipeline/executor.js';
 import type { CombatResolver } from '../pipeline/combat-resolver.js';
+import type { ResourceProcessor } from '../pipeline/resource-processor.js';
 import type { StateBroadcaster } from './broadcaster.js';
 import type { GameWebSocketServer } from './ws-server.js';
 import { TICK_RATE_MS, SNAPSHOT_INTERVAL_TICKS } from '../shared/constants.js';
@@ -18,6 +19,7 @@ export class TickLoop {
   private executor: ActionExecutor;
   private combatResolver: CombatResolver | null = null;
   private db: Database;
+  private resourceProcessor: ResourceProcessor | null = null;
   private broadcaster: StateBroadcaster | null = null;
   private wsServer: GameWebSocketServer | null = null;
 
@@ -39,6 +41,10 @@ export class TickLoop {
 
   setCombatResolver(combatResolver: CombatResolver): void {
     this.combatResolver = combatResolver;
+  }
+
+  setResourceProcessor(rp: ResourceProcessor): void {
+    this.resourceProcessor = rp;
   }
 
   setBroadcaster(broadcaster: StateBroadcaster, wsServer: GameWebSocketServer): void {
@@ -84,8 +90,10 @@ export class TickLoop {
     // 6. Process NPC monster AI (Phase 3 — placeholder)
     // this.monsterProcessor.tick(this.world, tick);
 
-    // 7. Process resource regeneration / growth (Phase 3 — placeholder)
-    // this.resourceProcessor.tick(this.world, tick);
+    // 7. Process resource regeneration / growth
+    if (this.resourceProcessor) {
+      this.resourceProcessor.tick(this.world, tick);
+    }
 
     // 8. Process behemoth lifecycle (Phase 3 — placeholder)
     // this.behemothProcessor.tick(this.world, tick);
