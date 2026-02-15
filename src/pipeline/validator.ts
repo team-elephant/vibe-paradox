@@ -357,9 +357,10 @@ export class ActionValidator {
     const food = agent.inventory.find((i) => i.id === params.itemId);
     if (!food || food.quantity < 1) return this.reject(action, 'No food item in inventory');
 
-    // Check behemoth exists and in range
+    // Check behemoth exists, is roaming, and in range
     const behemoth = world.behemoths.get(params.behemothId);
     if (!behemoth) return this.reject(action, 'Behemoth not found');
+    if (behemoth.status !== 'roaming') return this.reject(action, 'Behemoth cannot be fed right now');
     if (distance(agent.position, behemoth.position) > CLIMB_RANGE) {
       return this.reject(action, 'Too far');
     }

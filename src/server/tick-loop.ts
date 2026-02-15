@@ -8,6 +8,7 @@ import type { ActionValidator } from '../pipeline/validator.js';
 import type { ActionExecutor, ExecutionResult } from '../pipeline/executor.js';
 import type { CombatResolver } from '../pipeline/combat-resolver.js';
 import type { ResourceProcessor } from '../pipeline/resource-processor.js';
+import type { BehemothProcessor } from '../pipeline/behemoth-processor.js';
 import type { StateBroadcaster } from './broadcaster.js';
 import type { GameWebSocketServer } from './ws-server.js';
 import type { EconomyProcessor } from '../pipeline/economy-processor.js';
@@ -23,6 +24,7 @@ export class TickLoop {
   private db: Database;
   private resourceProcessor: ResourceProcessor | null = null;
   private economyProcessor: EconomyProcessor | null = null;
+  private behemothProcessor: BehemothProcessor | null = null;
   private broadcaster: StateBroadcaster | null = null;
   private wsServer: GameWebSocketServer | null = null;
   private monsterProcessor: MonsterProcessor | null = null;
@@ -53,6 +55,10 @@ export class TickLoop {
 
   setEconomyProcessor(economyProcessor: EconomyProcessor): void {
     this.economyProcessor = economyProcessor;
+  }
+
+  setBehemothProcessor(processor: BehemothProcessor): void {
+    this.behemothProcessor = processor;
   }
 
   setBroadcaster(broadcaster: StateBroadcaster, wsServer: GameWebSocketServer): void {
@@ -109,8 +115,14 @@ export class TickLoop {
       this.resourceProcessor.tick(this.world, tick);
     }
 
-    // 8. Process behemoth lifecycle (Phase 3 — placeholder)
-    // this.behemothProcessor.tick(this.world, tick);
+    // 8. Process behemoth lifecycle
+    if (this.behemothProcessor) {
+      const throwOffs = this.behemothProcessor.tick(this.world, tick);
+      // Executor handles agent mutations from behemoth throw-offs
+      if (throwOffs.length > 0) {
+        this.executor.processThrowOffs(throwOffs, this.world, tick);
+      }
+    }
 
     // 8.5. Process economy (trades expiry + crafting completion)
     // EconomyProcessor returns result objects; executor applies mutations.

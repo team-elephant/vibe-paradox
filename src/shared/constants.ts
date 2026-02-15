@@ -28,6 +28,7 @@ export const BEHEMOTH_UNCONSCIOUS_TICKS = 60;
 export const BEHEMOTH_FEED_THRESHOLD = 10;
 export const BEHEMOTH_ORE_GROWTH_TICKS = 120;
 export const BEHEMOTH_THROW_DAMAGE_PERCENT = 0.50;
+export const BEHEMOTH_SPEED = 2;
 
 export const NPC_AGGRO_RANGE = 30;
 export const NPC_CHASE_RANGE = 60;
