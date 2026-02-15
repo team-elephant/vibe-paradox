@@ -6,6 +6,7 @@ import type { Database } from './db.js';
 import type { ActionQueue } from '../pipeline/action-queue.js';
 import type { ActionValidator } from '../pipeline/validator.js';
 import type { ActionExecutor, ExecutionResult } from '../pipeline/executor.js';
+import type { CombatResolver } from '../pipeline/combat-resolver.js';
 import type { StateBroadcaster } from './broadcaster.js';
 import type { GameWebSocketServer } from './ws-server.js';
 import { TICK_RATE_MS, SNAPSHOT_INTERVAL_TICKS } from '../shared/constants.js';
@@ -15,6 +16,7 @@ export class TickLoop {
   private actionQueue: ActionQueue;
   private validator: ActionValidator;
   private executor: ActionExecutor;
+  private combatResolver: CombatResolver | null = null;
   private db: Database;
   private broadcaster: StateBroadcaster | null = null;
   private wsServer: GameWebSocketServer | null = null;
@@ -33,6 +35,10 @@ export class TickLoop {
     this.validator = validator;
     this.executor = executor;
     this.db = db;
+  }
+
+  setCombatResolver(combatResolver: CombatResolver): void {
+    this.combatResolver = combatResolver;
   }
 
   setBroadcaster(broadcaster: StateBroadcaster, wsServer: GameWebSocketServer): void {
@@ -68,6 +74,12 @@ export class TickLoop {
 
     // 5. Process continuous effects (movement, gathering progress)
     this.executor.processContinuous(this.world, tick);
+
+    // 5b. Resolve combat and cleanup inactive pairs
+    if (this.combatResolver) {
+      this.combatResolver.resolveCombat(this.executor.combatPairs, this.world, tick);
+      this.executor.cleanupCombatPairs();
+    }
 
     // 6. Process NPC monster AI (Phase 3 — placeholder)
     // this.monsterProcessor.tick(this.world, tick);

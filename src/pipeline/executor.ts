@@ -164,6 +164,15 @@ export class ActionExecutor {
     return { changes, spawns: [] };
   }
 
+  /** Remove inactive combat pairs to prevent unbounded growth. */
+  cleanupCombatPairs(): void {
+    for (let i = this.combatPairs.length - 1; i >= 0; i--) {
+      if (!this.combatPairs[i].active) {
+        this.combatPairs.splice(i, 1);
+      }
+    }
+  }
+
   private executeAttack(
     params: Extract<ActionParams, { type: 'attack' }>,
     agent: Agent,
@@ -174,6 +183,13 @@ export class ActionExecutor {
 
     const oldStatus = agent.status;
     agent.status = 'fighting';
+
+    // Deactivate any existing active combat pair for this attacker
+    for (const existing of this.combatPairs) {
+      if (existing.attackerId === agent.id && existing.active) {
+        existing.active = false;
+      }
+    }
 
     // Create combat pair
     const pair: CombatPair = {
