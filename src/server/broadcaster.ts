@@ -235,6 +235,8 @@ export class StateBroadcaster {
         return event.agentId === agentId;
       case 'tree_planted':
         return event.agentId === agentId;
+      case 'trade_proposed':
+        return event.buyer === agentId || event.seller === agentId;
       case 'trade_complete':
         return event.buyer === agentId || event.seller === agentId;
       case 'craft_complete':

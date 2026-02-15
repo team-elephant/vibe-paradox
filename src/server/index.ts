@@ -13,12 +13,19 @@ import { ActionExecutor } from '../pipeline/executor.js';
 import { TickLoop } from './tick-loop.js';
 import { StateBroadcaster } from './broadcaster.js';
 import { GameWebSocketServer } from './ws-server.js';
+import { CombatResolver } from '../pipeline/combat-resolver.js';
+import { ResourceProcessor } from '../pipeline/resource-processor.js';
+import { EconomyProcessor } from '../pipeline/economy-processor.js';
+import { MonsterProcessor } from '../pipeline/monster-processor.js';
+import { BehemothProcessor } from '../pipeline/behemoth-processor.js';
+import { AdminServer } from './admin.js';
 
 // --- CLI arg parsing (simple, no commander needed for server) ---
 
-function parseArgs(): { port: number; dbPath: string; seed: number } {
+function parseArgs(): { port: number; adminPort: number; dbPath: string; seed: number } {
   const args = process.argv.slice(2);
   let port = 8080;
+  let adminPort = 8081;
   let dbPath = 'vibe-paradox.db';
   let seed = 42;
 
@@ -26,6 +33,9 @@ function parseArgs(): { port: number; dbPath: string; seed: number } {
     switch (args[i]) {
       case '--port':
         port = Number(args[++i]);
+        break;
+      case '--admin-port':
+        adminPort = Number(args[++i]);
         break;
       case '--db':
         dbPath = args[++i]!;
@@ -36,12 +46,12 @@ function parseArgs(): { port: number; dbPath: string; seed: number } {
     }
   }
 
-  return { port, dbPath, seed };
+  return { port, adminPort, dbPath, seed };
 }
 
 // --- Main ---
 
-const { port, dbPath, seed } = parseArgs();
+const { port, adminPort, dbPath, seed } = parseArgs();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = resolve(__dirname, '../../db/migrations');
@@ -111,9 +121,23 @@ const actionQueue = new ActionQueue();
 const validator = new ActionValidator();
 const executor = new ActionExecutor();
 const broadcaster = new StateBroadcaster();
+const combatResolver = new CombatResolver();
+const resourceProcessor = new ResourceProcessor();
+const economyProcessor = new EconomyProcessor();
+const monsterProcessor = new MonsterProcessor();
+const behemothProcessor = new BehemothProcessor();
+
+// Wire cross-references
+executor.setResourceProcessor(resourceProcessor);
+executor.behemothProcessor = behemothProcessor;
 
 // 4. Create tick loop
 const tickLoop = new TickLoop(world, actionQueue, validator, executor, db);
+tickLoop.setCombatResolver(combatResolver);
+tickLoop.setResourceProcessor(resourceProcessor);
+tickLoop.setEconomyProcessor(economyProcessor);
+tickLoop.setMonsterProcessor(monsterProcessor);
+tickLoop.setBehemothProcessor(behemothProcessor);
 
 // 5. Create WebSocket server
 const wsServer = new GameWebSocketServer(port, world, actionQueue);
@@ -121,9 +145,14 @@ const wsServer = new GameWebSocketServer(port, world, actionQueue);
 // 6. Hook broadcaster into tick loop
 tickLoop.setBroadcaster(broadcaster, wsServer);
 
+// 6b. Create admin dashboard server and hook into tick loop
+const adminServer = new AdminServer(adminPort);
+tickLoop.setAdminServer(adminServer);
+
 // 7. Start tick loop
 tickLoop.start();
 console.log(`[VP] Server started on ws://localhost:${port}`);
+console.log(`[VP] Admin dashboard on http://localhost:${adminPort}?key=${adminServer.getKey()}`);
 console.log(`[VP] Tick loop running (1s intervals). Current tick: ${world.tick}`);
 
 // --- Periodic status logging ---
@@ -165,6 +194,10 @@ function shutdown(signal: string): void {
   // 4. Close WebSocket server
   wsServer.close();
   console.log('[VP] WebSocket server closed.');
+
+  // 4b. Close admin server
+  adminServer.close();
+  console.log('[VP] Admin server closed.');
 
   // 5. Close database
   db.close();

@@ -7,9 +7,10 @@
     "dev": "tsx src/server/index.ts",
     "build": "tsup",
     "test": "vitest run",
-    "start": "node dist/server/index.js"
+    "start": "node dist/src/server/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "better-sqlite3": "^11.0.0",
     "commander": "^12.0.0",
     "ws": "^8.16.0"
@@ -17,8 +18,8 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
     "@types/ws": "^8.5.10",
-    "tsx": "^4.7.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.4.0",
     "vitest": "^2.0.0"
   }

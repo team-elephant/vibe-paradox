@@ -11,6 +11,7 @@ import type { ResourceProcessor } from '../pipeline/resource-processor.js';
 import type { BehemothProcessor } from '../pipeline/behemoth-processor.js';
 import type { StateBroadcaster } from './broadcaster.js';
 import type { GameWebSocketServer } from './ws-server.js';
+import type { AdminServer } from './admin.js';
 import type { EconomyProcessor } from '../pipeline/economy-processor.js';
 import type { MonsterProcessor } from '../pipeline/monster-processor.js';
 import { TICK_RATE_MS, SNAPSHOT_INTERVAL_TICKS } from '../shared/constants.js';
@@ -27,6 +28,7 @@ export class TickLoop {
   private behemothProcessor: BehemothProcessor | null = null;
   private broadcaster: StateBroadcaster | null = null;
   private wsServer: GameWebSocketServer | null = null;
+  private adminServer: AdminServer | null = null;
   private monsterProcessor: MonsterProcessor | null = null;
 
   private tickInterval: ReturnType<typeof setInterval> | null = null;
@@ -64,6 +66,10 @@ export class TickLoop {
   setBroadcaster(broadcaster: StateBroadcaster, wsServer: GameWebSocketServer): void {
     this.broadcaster = broadcaster;
     this.wsServer = wsServer;
+  }
+
+  setAdminServer(adminServer: AdminServer): void {
+    this.adminServer = adminServer;
   }
 
   setMonsterProcessor(monsterProcessor: MonsterProcessor): void {
@@ -155,6 +161,11 @@ export class TickLoop {
     // 12. Broadcast personalized state to each connected agent
     if (this.broadcaster && this.wsServer) {
       this.broadcaster.broadcastTick(this.world, tickResult, this.wsServer);
+    }
+
+    // 12b. Broadcast full state to admin dashboard viewers
+    if (this.adminServer) {
+      this.adminServer.broadcastTick(this.world, tickResult);
     }
 
     // 13. Persist (snapshot every SNAPSHOT_INTERVAL_TICKS)

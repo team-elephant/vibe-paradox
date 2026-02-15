@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIBE PARADOX — LIVE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
+
+:root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-panel: #0d0d0d;
+  --border: #222222;
+  --text-primary: #00ff88;
+  --text-secondary: #668866;
+  --color-fighter: #44aaff;
+  --color-merchant: #00ff88;
+  --color-monster: #ff4444;
+  --color-npc: #666666;
+  --color-behemoth: #aa44ff;
+  --color-gold: #ffaa00;
+  --color-combat: #ff2222;
+  --color-trade: #44aaff;
+  --color-evolution: #ff44ff;
+  --color-resource: #00aa44;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+}
+
+#app {
+  display: grid;
+  grid-template-rows: 40px 1fr 200px;
+  grid-template-columns: 1fr 320px;
+  height: 100vh;
+  gap: 1px;
+  background: var(--border);
+}
+
+/* === HEADER === */
+#header {
+  grid-column: 1 / -1;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 13px;
+}
+#header .title {
+  font-weight: 600;
+  letter-spacing: 2px;
+  font-size: 14px;
+}
+#header .status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+#header .status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4444;
+}
+#header .status .dot.connected {
+  background: var(--text-primary);
+  box-shadow: 0 0 6px var(--text-primary);
+}
+
+/* === CANVAS === */
+#map-panel {
+  background: var(--bg-panel);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#map-panel canvas {
+  display: block;
+}
+/* scanline overlay */
+#map-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.04) 2px,
+    rgba(0,0,0,0.04) 4px
+  );
+  pointer-events: none;
+}
+
+/* tooltip */
+#tooltip {
+  display: none;
+  position: absolute;
+  background: rgba(10,10,10,0.95);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-primary);
+  pointer-events: none;
+  z-index: 10;
+  white-space: pre;
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+/* === RIGHT PANEL === */
+#right-panel {
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#stats-panel {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+#stats-panel h3 {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+#stats-panel .stat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+#stats-panel .stat-label {
+  color: var(--text-secondary);
+}
+
+#agents-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+#agents-panel h3 {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  padding: 8px 12px 4px;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+}
+.agent-card {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.agent-card:hover {
+  background: var(--bg-secondary);
+}
+.agent-card.selected {
+  background: #1a1a1a;
+  border-left: 2px solid var(--text-primary);
+}
+.agent-card .agent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+.agent-card .agent-name {
+  font-weight: 600;
+}
+.agent-card .agent-status {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+.agent-card .agent-status.idle { color: var(--text-primary); }
+.agent-card .agent-status.moving { color: var(--color-gold); }
+.agent-card .agent-status.fighting { color: var(--color-combat); }
+.agent-card .agent-status.gathering { color: var(--color-fighter); }
+.agent-card .agent-status.dead { color: #555; }
+.agent-card .agent-status.crafting { color: var(--color-trade); }
+.agent-card .agent-status.climbing { color: var(--color-behemoth); }
+.agent-card .agent-status.trading { color: var(--color-trade); }
+
+.agent-card .agent-details {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.health-bar {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: -1px;
+}
+.health-bar .filled { color: var(--text-primary); }
+.health-bar .empty { color: #333; }
+
+/* === EVENT FEED === */
+#event-feed {
+  grid-column: 1 / -1;
+  background: var(--bg-panel);
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+#event-feed h3 {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  padding-bottom: 4px;
+}
+.event-line {
+  margin-bottom: 2px;
+  line-height: 1.5;
+  animation: fadeIn 0.3s ease-in;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.event-tick {
+  color: var(--text-secondary);
+}
+.event-combat   { color: var(--color-combat); }
+.event-resource  { color: var(--color-resource); }
+.event-trade     { color: var(--color-trade); }
+.event-evolution { color: var(--color-evolution); }
+.event-death     { color: #ff6666; }
+.event-behemoth  { color: var(--color-behemoth); }
+.event-chat      { color: var(--text-secondary); }
+.event-alliance  { color: #66ffff; }
+.event-spawn     { color: var(--color-resource); }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <span class="title">VIBE PARADOX &mdash; LIVE</span>
+    <span class="status">
+      <span id="tick-display">Tick: 0</span>
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-label">disconnected</span>
+    </span>
+  </div>
+
+  <div id="map-panel">
+    <canvas id="world-canvas"></canvas>
+    <div id="tooltip"></div>
+  </div>
+
+  <div id="right-panel">
+    <div id="stats-panel">
+      <h3>WORLD STATS</h3>
+      <div id="stats-content"></div>
+    </div>
+    <div id="agents-panel">
+      <h3>AGENTS</h3>
+      <div id="agents-list"></div>
+    </div>
+  </div>
+
+  <div id="event-feed">
+    <h3>EVENT FEED</h3>
+    <div id="events-list"></div>
+  </div>
+</div>
+
+<script>
+// === HTML ESCAPE (prevent XSS from agent names, chat messages, etc.) ===
+function esc(str) {
+  if (typeof str !== 'string') return String(str);
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// === STATE ===
+let state = null;
+let selectedAgentId = null;
+let hoveredAgent = null;
+let mouseX = 0, mouseY = 0;
+const eventLog = [];
+const MAX_EVENTS = 100;
+
+// === CANVAS SETUP ===
+const canvas = document.getElementById('world-canvas');
+const ctx = canvas.getContext('2d');
+const WORLD_SIZE = 1000;
+let canvasSize = 600;
+let scale = canvasSize / WORLD_SIZE;
+
+function resizeCanvas() {
+  const panel = document.getElementById('map-panel');
+  const s = Math.min(panel.clientWidth, panel.clientHeight) - 8;
+  canvasSize = Math.max(300, s);
+  canvas.width = canvasSize;
+  canvas.height = canvasSize;
+  scale = canvasSize / WORLD_SIZE;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function worldToCanvas(x, y) {
+  return [x * scale, y * scale];
+}
+
+// === COLORS ===
+const ROLE_COLORS = {
+  fighter: '#44aaff',
+  merchant: '#00ff88',
+  monster: '#ff4444',
+};
+const NPC_COLOR = '#666666';
+const BEHEMOTH_COLOR = '#aa44ff';
+const TREE_COLOR = '#1a5c1a';
+const GOLD_COLOR = '#ffaa00';
+const SAPLING_COLOR = '#88ff88';
+
+// === RENDERING ===
+let animFrame = 0;
+
+function render() {
+  animFrame++;
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+  // grid lines every 100 world units
+  ctx.strokeStyle = '#161616';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= WORLD_SIZE; i += 100) {
+    const p = i * scale;
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, canvasSize); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(canvasSize, p); ctx.stroke();
+  }
+
+  if (!state) {
+    ctx.fillStyle = '#333';
+    ctx.font = '14px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for server...', canvasSize / 2, canvasSize / 2);
+    requestAnimationFrame(render);
+    return;
+  }
+
+  // safe zone
+  const [sx, sy] = worldToCanvas(500, 500);
+  const sr = 100 * scale;
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.01)';
+  ctx.fill();
+
+  // resources
+  for (const r of state.resources) {
+    const [rx, ry] = worldToCanvas(r.position.x, r.position.y);
+    if (r.type === 'tree') {
+      ctx.fillStyle = TREE_COLOR;
+      ctx.fillRect(rx - 1, ry - 1, 2, 2);
+    } else if (r.type === 'gold_vein') {
+      ctx.fillStyle = GOLD_COLOR;
+      ctx.beginPath();
+      ctx.arc(rx, ry, 2 * scale / (canvasSize / 600) || 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (r.type === 'sapling') {
+      ctx.fillStyle = SAPLING_COLOR;
+      ctx.fillRect(rx - 1, ry - 1, 2, 2);
+    }
+  }
+
+  // NPC monsters
+  for (const npc of state.npcMonsters) {
+    const [nx, ny] = worldToCanvas(npc.position.x, npc.position.y);
+    ctx.fillStyle = NPC_COLOR;
+    ctx.beginPath();
+    ctx.arc(nx, ny, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // behemoths
+  for (const b of state.behemoths) {
+    const [bx, by] = worldToCanvas(b.position.x, b.position.y);
+    ctx.fillStyle = BEHEMOTH_COLOR;
+    const pulse = b.status === 'unconscious' ? 10 + Math.sin(animFrame * 0.1) * 3 : 10;
+    ctx.beginPath();
+    ctx.arc(bx, by, pulse, 0, Math.PI * 2);
+    ctx.globalAlpha = b.status === 'unconscious' ? 0.5 + Math.sin(animFrame * 0.1) * 0.3 : 0.8;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // label
+    ctx.fillStyle = BEHEMOTH_COLOR;
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.type, bx, by - pulse - 3);
+  }
+
+  // combat lines — find fighting agents and draw line to their combat targets
+  // We draw red dashed lines between agents in 'fighting' status and nearby NPCs/agents also in fighting
+  // Simple heuristic: draw lines between all fighting pairs based on proximity
+  const fightingAgents = state.agents.filter(a => a.status === 'fighting');
+  for (const a of fightingAgents) {
+    // find closest fighting entity
+    let closest = null;
+    let closestDist = Infinity;
+
+    for (const npc of state.npcMonsters) {
+      if (npc.status === 'attack' || npc.status === 'chase') {
+        const d = Math.hypot(a.position.x - npc.position.x, a.position.y - npc.position.y);
+        if (d < closestDist && d < 20) { closestDist = d; closest = npc; }
+      }
+    }
+    for (const other of state.agents) {
+      if (other.id !== a.id && other.status === 'fighting') {
+        const d = Math.hypot(a.position.x - other.position.x, a.position.y - other.position.y);
+        if (d < closestDist && d < 20) { closestDist = d; closest = other; }
+      }
+    }
+
+    if (closest) {
+      const [ax, ay] = worldToCanvas(a.position.x, a.position.y);
+      const [tx, ty] = worldToCanvas(closest.position.x, closest.position.y);
+      ctx.strokeStyle = 'rgba(255,34,34,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+    }
+  }
+
+  // agents
+  for (const agent of state.agents) {
+    const [ax, ay] = worldToCanvas(agent.position.x, agent.position.y);
+    const color = ROLE_COLORS[agent.role] || '#fff';
+    let radius = 4;
+    if (agent.role === 'monster') {
+      radius = agent.evolutionStage === 1 ? 5 :
+               agent.evolutionStage === 2 ? 6 :
+               agent.evolutionStage === 3 ? 8 : 12;
+    }
+
+    // movement line
+    if (agent.destination) {
+      const [dx, dy] = worldToCanvas(agent.destination.x, agent.destination.y);
+      ctx.strokeStyle = color + '33';
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(dx, dy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // selected highlight
+    if (selectedAgentId === agent.id) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(ax, ay, radius + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // vision radius on hover
+    if (hoveredAgent && hoveredAgent.id === agent.id) {
+      const vr = getVisionRadius(agent) * scale;
+      ctx.strokeStyle = color + '22';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(ax, ay, vr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // disconnected indicator
+    if (!agent.isConnected) {
+      ctx.globalAlpha = 0.4;
+    }
+
+    // body
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(ax, ay, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    // label
+    ctx.fillStyle = color;
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(agent.name, ax, ay - radius - 3);
+  }
+
+  requestAnimationFrame(render);
+}
+
+function getVisionRadius(agent) {
+  if (agent.role === 'merchant') return 80;
+  if (agent.role === 'fighter') return 100;
+  if (agent.role === 'monster') {
+    if (agent.evolutionStage >= 4) return 250;
+    if (agent.evolutionStage >= 3) return 200;
+    return 150;
+  }
+  return 100;
+}
+
+// === HOVER + CLICK ===
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+
+  if (!state) return;
+
+  const worldX = mouseX / scale;
+  const worldY = mouseY / scale;
+
+  let closest = null;
+  let closestDist = Infinity;
+
+  for (const a of state.agents) {
+    const d = Math.hypot(a.position.x - worldX, a.position.y - worldY);
+    if (d < 15 && d < closestDist) {
+      closestDist = d;
+      closest = a;
+    }
+  }
+
+  hoveredAgent = closest;
+  const tooltip = document.getElementById('tooltip');
+
+  if (closest) {
+    const hp = closest.health;
+    const mhp = closest.maxHealth;
+    const txt = [
+      `${closest.name} (${closest.role})`,
+      `HP: ${Math.round(hp)}/${mhp}  ATK: ${closest.attack}  DEF: ${closest.defense}`,
+      `Gold: ${Math.round(closest.gold)}  Items: ${closest.inventory.length}`,
+      `Pos: (${Math.round(closest.position.x)}, ${Math.round(closest.position.y)})`,
+      closest.alliance ? `Alliance: ${closest.alliance}` : '',
+      closest.role === 'monster' ? `Kills: ${closest.kills}  Stage: ${closest.evolutionStage}` : '',
+    ].filter(Boolean).join('\n');
+
+    tooltip.textContent = txt;
+    tooltip.style.display = 'block';
+
+    // position tooltip near mouse within panel
+    const panel = document.getElementById('map-panel');
+    const pr = panel.getBoundingClientRect();
+    let tx = e.clientX - pr.left + 12;
+    let ty = e.clientY - pr.top + 12;
+    if (tx + 260 > pr.width) tx -= 280;
+    if (ty + 100 > pr.height) ty -= 120;
+    tooltip.style.left = tx + 'px';
+    tooltip.style.top = ty + 'px';
+  } else {
+    tooltip.style.display = 'none';
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredAgent = null;
+  document.getElementById('tooltip').style.display = 'none';
+});
+
+canvas.addEventListener('click', (e) => {
+  if (!state) return;
+  const rect = canvas.getBoundingClientRect();
+  const wx = (e.clientX - rect.left) / scale;
+  const wy = (e.clientY - rect.top) / scale;
+
+  let closest = null;
+  let closestDist = Infinity;
+  for (const a of state.agents) {
+    const d = Math.hypot(a.position.x - wx, a.position.y - wy);
+    if (d < 20 && d < closestDist) { closestDist = d; closest = a; }
+  }
+  selectedAgentId = closest ? closest.id : null;
+  updateAgentList();
+});
+
+// === UI UPDATES ===
+function updateStats() {
+  if (!state) return;
+  const connectedCount = state.agents.filter(a => a.isConnected).length;
+  const el = document.getElementById('stats-content');
+  el.innerHTML = [
+    row('Agents', `${connectedCount} connected / ${state.agents.length} total`),
+    row('NPCs', state.npcMonsters.length),
+    row('Trees', state.resourceCounts.trees),
+    row('Gold veins', state.resourceCounts.goldVeins),
+    row('Saplings', state.resourceCounts.saplings),
+    row('Behemoths', state.behemoths.length),
+  ].join('');
+}
+
+function row(label, value) {
+  return `<div class="stat-row"><span class="stat-label">${label}</span><span>${value}</span></div>`;
+}
+
+function updateAgentList() {
+  if (!state) return;
+  const el = document.getElementById('agents-list');
+
+  // sort: fighters, merchants, monsters
+  const order = { fighter: 0, merchant: 1, monster: 2 };
+  const sorted = [...state.agents].sort((a, b) => (order[a.role] ?? 3) - (order[b.role] ?? 3));
+
+  el.innerHTML = sorted.map(a => {
+    const color = ROLE_COLORS[a.role] || '#fff';
+    const sel = selectedAgentId === a.id ? ' selected' : '';
+    const hpBar = buildHealthBar(a.health, a.maxHealth);
+    const posStr = `(${Math.round(a.position.x)}, ${Math.round(a.position.y)})`;
+    const destStr = a.destination ? ` → (${Math.round(a.destination.x)}, ${Math.round(a.destination.y)})` : '';
+    const allianceStr = a.alliance ? `\n  Alliance: ${esc(a.alliance)}` : '';
+    const equipParts = [];
+    if (a.equipment.weapon) equipParts.push(esc(a.equipment.weapon));
+    if (a.equipment.armor) equipParts.push(esc(a.equipment.armor));
+    if (a.equipment.tool) equipParts.push(esc(a.equipment.tool));
+    const equipStr = equipParts.length > 0 ? `\n  Equip: ${equipParts.join(', ')}` : '';
+    const monsterStr = a.role === 'monster' ? `  Kills: ${a.kills}  Stage: ${a.evolutionStage}` : '';
+    const connIcon = a.isConnected ? '' : ' [DC]';
+    const escapedId = esc(a.id);
+    const escapedName = esc(a.name);
+
+    return `<div class="agent-card${sel}" data-id="${escapedId}" onclick="selectAgent('${escapedId}')">
+  <div class="agent-header">
+    <span class="agent-name" style="color:${color}">${escapedName}${connIcon}</span>
+    <span class="agent-status ${esc(a.status)}">[${esc(a.status.toUpperCase())}]</span>
+  </div>
+  <div class="agent-details">
+    HP: ${hpBar} ${Math.round(a.health)}/${a.maxHealth}
+    ATK: ${a.attack}  DEF: ${a.defense}  SPD: ${a.speed}
+    Gold: ${Math.round(a.gold)}${monsterStr}
+    Pos: ${posStr}${destStr}${allianceStr}${equipStr}
+  </div>
+</div>`;
+  }).join('');
+}
+
+function selectAgent(id) {
+  selectedAgentId = selectedAgentId === id ? null : id;
+  updateAgentList();
+}
+
+function buildHealthBar(hp, maxHp) {
+  const total = 10;
+  const filled = Math.round((hp / maxHp) * total);
+  const f = '\u2588'.repeat(Math.max(0, filled));
+  const e = '\u2591'.repeat(Math.max(0, total - filled));
+  return `<span class="health-bar"><span class="filled">${f}</span><span class="empty">${e}</span></span>`;
+}
+
+// === EVENT FEED ===
+function updateEventFeed(events, messages, tick) {
+  if (!state) return;
+
+  // process world events
+  for (const ev of events) {
+    const line = formatEvent(ev, tick);
+    if (line) eventLog.push(line);
+  }
+
+  // process chat messages
+  for (const msg of messages) {
+    const modeTag = msg.mode === 'broadcast' ? 'broadcast' : msg.mode === 'whisper' ? 'whisper' : 'local';
+    eventLog.push({
+      tick,
+      cls: 'event-chat',
+      text: `\uD83D\uDCAC ${esc(msg.senderName)} [${modeTag}]: "${esc(truncate(msg.content, 50))}"`,
+    });
+  }
+
+  // trim
+  while (eventLog.length > MAX_EVENTS) eventLog.shift();
+
+  // render
+  const el = document.getElementById('events-list');
+  el.innerHTML = eventLog.map(e =>
+    `<div class="event-line ${e.cls}"><span class="event-tick">[${e.tick}]</span> ${e.text}</div>`
+  ).join('');
+
+  // auto-scroll
+  const feed = document.getElementById('event-feed');
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function formatEvent(ev, tick) {
+  const agentName = (id) => {
+    if (!state) return esc(id);
+    const a = state.agents.find(a => a.id === id);
+    return a ? esc(a.name) : esc(id);
+  };
+
+  switch (ev.type) {
+    case 'combat_hit':
+      return { tick, cls: 'event-combat', text: `\u2694\uFE0F ${agentName(ev.attackerId)} hit ${agentName(ev.targetId)} for ${ev.damage} dmg (${Math.round(ev.targetHealthAfter)} HP left)` };
+    case 'death':
+      return { tick, cls: 'event-death', text: `\uD83D\uDC80 ${agentName(ev.entityId)} was killed${ev.killedBy ? ' by ' + agentName(ev.killedBy) : ''} (+${ev.droppedGold} gold dropped)` };
+    case 'respawn':
+      return { tick, cls: 'event-spawn', text: `\u2728 ${agentName(ev.agentId)} respawned` };
+    case 'evolution':
+      return { tick, cls: 'event-evolution', text: `\u26A1 ${agentName(ev.monsterId)} evolved to Stage ${ev.toStage}!` };
+    case 'resource_gathered':
+      return { tick, cls: 'event-resource', text: `\u26CF\uFE0F ${agentName(ev.agentId)} gathered ${ev.quantity} ${esc(ev.item)}` };
+    case 'resource_depleted':
+      return { tick, cls: 'event-resource', text: `\uD83E\uDEA8 Resource depleted at (${Math.round(ev.position.x)}, ${Math.round(ev.position.y)})` };
+    case 'tree_planted':
+      return { tick, cls: 'event-resource', text: `\uD83C\uDF31 ${agentName(ev.agentId)} planted a tree seed` };
+    case 'tree_grown':
+      return { tick, cls: 'event-resource', text: `\uD83C\uDF33 A tree has grown at (${Math.round(ev.position.x)}, ${Math.round(ev.position.y)})` };
+    case 'trade_complete':
+      return { tick, cls: 'event-trade', text: `\uD83D\uDD04 ${agentName(ev.buyer)} traded with ${agentName(ev.seller)}` };
+    case 'craft_complete':
+      return { tick, cls: 'event-trade', text: `\uD83D\uDD28 ${agentName(ev.agentId)} crafted ${esc(ev.item)}` };
+    case 'behemoth_knockout':
+      return { tick, cls: 'event-behemoth', text: `\uD83C\uDFD4\uFE0F Behemoth knocked unconscious!` };
+    case 'behemoth_wake':
+      return { tick, cls: 'event-behemoth', text: `\uD83C\uDFD4\uFE0F Behemoth woke up! ${ev.thrownOff.length} thrown off` };
+    case 'alliance_formed':
+      return { tick, cls: 'event-alliance', text: `\uD83C\uDFF0 ${agentName(ev.founder)} formed alliance "${esc(ev.name)}"` };
+    case 'alliance_joined':
+      return { tick, cls: 'event-alliance', text: `\uD83C\uDFF0 ${agentName(ev.agentId)} joined alliance "${esc(ev.name)}"` };
+    case 'npc_spawn':
+      return { tick, cls: 'event-spawn', text: `\uD83D\uDC7E NPC ${esc(ev.template)} spawned` };
+    case 'monster_eat':
+      return { tick, cls: 'event-combat', text: `\uD83C\uDF56 ${agentName(ev.eaterId)} devoured ${agentName(ev.eatenId)}` };
+    default:
+      return null;
+  }
+}
+
+function truncate(str, len) {
+  return str.length > len ? str.slice(0, len) + '...' : str;
+}
+
+// === WEBSOCKET ===
+let ws = null;
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const params = new URLSearchParams(location.search);
+  const key = params.get('key') || '';
+  ws = new WebSocket(`${proto}://${location.host}/ws?key=${encodeURIComponent(key)}`);
+
+  ws.onopen = () => {
+    document.getElementById('conn-dot').classList.add('connected');
+    document.getElementById('conn-label').textContent = 'connected';
+  };
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'admin_tick') {
+      state = data;
+      document.getElementById('tick-display').textContent = `Tick: ${data.tick}`;
+      updateStats();
+      updateAgentList();
+      updateEventFeed(data.events || [], data.messages || [], data.tick);
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('conn-dot').classList.remove('connected');
+    document.getElementById('conn-label').textContent = 'disconnected';
+    setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+}
+
+connect();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
