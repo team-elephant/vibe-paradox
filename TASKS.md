@@ -741,25 +741,285 @@ tests/alliance.test.ts (NEW)
 
 ## Phase 4: Polish
 
-### TASK-020: Admin Dashboard `[ ]`
+### TASK-020: Live Admin Dashboard — Real-Time World Viewer `[ ]`
 **Depends on:** TASK-011
 **Parallel-safe with:** Any Phase 3 task
 
-**Do:**
-1. Add HTTP server on port 8081 (separate from WS)
-2. Serve single HTML page with:
-   - Current tick, uptime
-   - Connected agents count, total agents count
-   - Agent table: name, role, position, health, gold, status, alliance
-   - Resource counts: trees, gold veins, saplings
-   - NPC monster count, behemoth statuses
-   - Auto-refresh every 2 seconds
-3. Endpoint: `GET /api/world-state` → JSON dump of key metrics
+**Overview:**
+A god-mode web dashboard that shows everything happening in the game in real time. No fog of war. Dark terminal aesthetic. This is the demo — the thing you open in a browser while agents play and people say "holy shit."
 
-**Files created:**
+Served as a single HTML file on HTTP port 8081. WebSocket connection for live state updates every tick.
+
+**Architecture — Server-Side: Admin WebSocket Endpoint**
+
+Create `src/server/admin.ts` with class `AdminServer`:
+- HTTP server on port 8081 serving dashboard.html
+- WebSocket server on same port (path: `/ws`) for admin state broadcasts
+- Admin viewers get FULL world state every tick — no fog of war:
+```json
+{
+  "type": "admin_tick",
+  "tick": 48201,
+  "agents": [
+    {
+      "id": "agent_xxx",
+      "name": "Fighter_001",
+      "role": "fighter",
+      "position": { "x": 234, "y": 567 },
+      "destination": { "x": 300, "y": 600 },
+      "status": "moving",
+      "health": 85,
+      "maxHealth": 100,
+      "attack": 20,
+      "defense": 10,
+      "speed": 4,
+      "gold": 45,
+      "inventory": [],
+      "equipment": { "weapon": "iron_sword", "armor": null, "tool": null },
+      "alliance": "Wolves",
+      "kills": 2,
+      "evolutionStage": 1,
+      "isConnected": true
+    }
+  ],
+  "npcMonsters": [
+    {
+      "id": "npc_xxx",
+      "template": "medium_wolf",
+      "position": { "x": 598, "y": 416 },
+      "health": 40,
+      "maxHealth": 60,
+      "status": "chasing",
+      "targetId": "agent_xxx"
+    }
+  ],
+  "behemoths": [
+    {
+      "id": "beh_xxx",
+      "type": "iron",
+      "position": { "x": 200, "y": 800 },
+      "health": 500,
+      "maxHealth": 500,
+      "status": "roaming",
+      "oreAvailable": false,
+      "unconsciousTicksRemaining": 0
+    }
+  ],
+  "resourceCounts": {
+    "trees": 1847,
+    "goldVeins": 48,
+    "saplings": 12
+  },
+  "resources": [
+    { "id": "res_xxx", "type": "tree", "position": { "x": 94, "y": 503 }, "remaining": 7 },
+    { "id": "res_xxx", "type": "gold_vein", "position": { "x": 850, "y": 120 }, "remaining": 230 }
+  ],
+  "events": [],
+  "messages": []
+}
 ```
-src/server/admin.ts (NEW)
+- Broadcast this to all admin WebSocket connections every tick
+- Separate from game WebSocket on port 8080 — admin is read-only, cannot send actions
+- Hook into tick loop: after game broadcaster, also call `adminServer.broadcastTick(world, tickResult)`
+
+**Server Wiring:**
+- Add `--admin-port` CLI arg to `src/server/index.ts` (default: 8081)
+- Create AdminServer instance in `index.ts`
+- Hook into tick loop alongside game broadcaster
+- Serve `dashboard.html` from admin HTTP server
+
+**Client-Side: Single HTML File**
+
+One file: `src/server/dashboard.html`
+No build step. No React. No npm dependencies. Raw HTML + Canvas + WebSocket + inline CSS/JS.
+
+**Dashboard Layout:**
 ```
+┌─────────────────────────────────────────────────────────┐
+│  VIBE PARADOX — LIVE                        Tick: 48201 │
+├────────────────────────────────┬────────────────────────┤
+│                                │  WORLD STATS           │
+│                                │  Agents: 6 (connected) │
+│       2D WORLD MAP             │  NPCs: 78              │
+│       (Canvas, 600x600px)      │  Trees: 1847           │
+│                                │  Gold veins: 48        │
+│       Shows ALL entities:      │  Behemoths: 5          │
+│       · Agents (colored by     │                        │
+│         role: blue=fighter,    ├────────────────────────┤
+│         green=merchant,        │  AGENTS                │
+│         red=monster)           │  Fighter_001 HP:100    │
+│       · NPC monsters (gray)    │    Gold:45 Pos:(234,5) │
+│       · Behemoths (purple,     │  Fighter_002 HP:85     │
+│         large)                 │    Gold:22 [FIGHTING]  │
+│       · Trees (green dots)     │  Merchant_001 HP:50    │
+│       · Gold veins (yellow)    │    Gold:0 [GATHERING]  │
+│       · Safe zone circle       │  Monster_001 HP:120    │
+│                                │    Kills:3 Stage:2     │
+├────────────────────────────────┴────────────────────────┤
+│  EVENT FEED (scrolling)                                 │
+│  [48201] Fighter_001 killed medium_wolf (+33 gold)      │
+│  [48199] Merchant_001 gathered 1 log from tree          │
+│  [48195] Monster_001 evolved to Stage 2!                │
+│  [48190] Fighter_002 traded iron_sword to Fighter_001   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Canvas Rendering:**
+Scale 1000x1000 world to 600x600px canvas. Use `requestAnimationFrame` loop, redraw on each tick update.
+
+**Entity Rendering:**
+
+| Entity | Color | Radius | Notes |
+|--------|-------|--------|-------|
+| Fighter (player) | `#44aaff` (blue) | 4px | Label: name |
+| Merchant (player) | `#00ff88` (green) | 4px | Label: name |
+| Monster (player) | `#ff4444` (red) | 5px | + evolution Stage 2: 6px, Stage 3: 8px, Stage 4: 12px |
+| NPC monster | `#666666` (gray) | 3px | No label |
+| Behemoth | `#aa44ff` (purple) | 10px | Pulsing animation when unconscious |
+| Tree | `#1a5c1a` (dark green) | 1px | No label |
+| Gold vein | `#ffaa00` (yellow) | 2px | No label |
+| Sapling | `#88ff88` (light green) | 1px | Slightly different from tree |
+
+**Interactive Elements:**
+- Safe zone: Faint white circle around (500, 500), radius 100 (scaled to canvas)
+- Movement lines: When agent is moving, draw faint dashed line from position to destination
+- Combat lines: Draw red line between active combatants
+- Hover: When mouse hovers over an agent, show:
+  - Vision radius as faint circle outline
+  - Tooltip with full stats (HP, ATK, DEF, gold, inventory count)
+- Click agent in sidebar: Highlight that agent on canvas, center view if zoomed
+
+**Design Direction:**
+
+Aesthetic: Dark terminal / war room surveillance. Black background, neon accents. Monospace font. Like watching a military radar screen tracking AI agents in a simulated world.
+
+Color Palette:
+```css
+:root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-panel: #0d0d0d;
+  --border: #222222;
+  --text-primary: #00ff88;       /* main text — green terminal */
+  --text-secondary: #668866;     /* dimmed text */
+  --color-fighter: #44aaff;      /* blue */
+  --color-merchant: #00ff88;     /* green */
+  --color-monster: #ff4444;      /* red */
+  --color-npc: #666666;          /* gray */
+  --color-behemoth: #aa44ff;     /* purple */
+  --color-gold: #ffaa00;         /* gold/economy */
+  --color-combat: #ff2222;       /* combat events */
+  --color-trade: #44aaff;        /* trade events */
+  --color-evolution: #ff44ff;    /* evolution events */
+  --color-resource: #00aa44;     /* resource events */
+}
+```
+
+Typography:
+```css
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
+* { font-family: 'JetBrains Mono', monospace; }
+```
+
+Visual Effects:
+- Subtle scanline overlay on canvas (CSS pseudo-element, very faint `repeating-linear-gradient`)
+- Faint grid on canvas background (every 100 world units = visual gridlines)
+- Pulse animation on behemoths when unconscious
+- Fade-in animation on new event feed entries
+- Connection status indicator (green dot = connected, red dot = disconnected)
+- Tick counter incrementing in header
+
+**Event Feed:**
+
+Scrolling log at the bottom. Keeps last 100 events. Auto-scrolls to newest.
+
+Event Formatting (color-code by event type):
+```
+[tick] 🗡️ Fighter_001 killed medium_wolf (+33 gold)          — red
+[tick] ⛏️ Merchant_001 gathered 1 log from tree_res_xxx      — green
+[tick] 🔄 Fighter_002 traded iron_sword → Merchant_001       — blue
+[tick] ⚡ Monster_001 evolved to Stage 2!                     — purple
+[tick] 💀 Monster_001 was killed by Fighter_001 (PERMADEATH) — bright red
+[tick] 🏔️ Iron Behemoth knocked unconscious!                 — purple
+[tick] 💬 Fighter_001 [broadcast]: "Need healing salve!"     — dim
+[tick] 🏰 Fighter_001 formed alliance "Wolves"               — cyan
+[tick] 🌱 Merchant_001 planted a tree seed                   — green
+```
+Convert WorldEvent types to human-readable strings with emoji prefixes. Include agent names, not IDs.
+
+**Agent Sidebar:**
+
+Right panel. Lists all connected agents sorted by role (fighters → merchants → monsters).
+
+Per agent:
+```
+Fighter_001                    [FIGHTING]
+  HP: ████████░░ 85/100
+  ATK: 20  DEF: 15  SPD: 4
+  Gold: 45
+  Pos: (234, 567) → (300, 600)
+  Alliance: Wolves
+  Equipped: iron_sword, iron_armor
+```
+- Health bar as ASCII/unicode block characters
+- Status in brackets, color-coded (green=idle, yellow=moving, red=fighting, blue=gathering)
+- Click to highlight on map
+
+**WebSocket Connection:**
+```javascript
+const ws = new WebSocket(`ws://${location.host}/ws`);
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === 'admin_tick') {
+    updateMap(data);
+    updateStats(data);
+    updateAgentList(data);
+    updateEventFeed(data.events, data.messages, data.tick);
+  }
+};
+
+// Auto-reconnect
+ws.onclose = () => {
+  setTimeout(() => connect(), 2000);
+};
+```
+
+**Files to Create / Modify:**
+
+New Files:
+```
+src/server/admin.ts         — AdminServer class (HTTP + WebSocket)
+src/server/dashboard.html   — Single-file dashboard (HTML + CSS + JS)
+```
+
+Modified Files:
+```
+src/server/index.ts         — Add --admin-port arg, create AdminServer, wire into tick loop
+src/server/tick-loop.ts     — Add admin broadcast after game broadcast (or do it in index.ts via callback)
+deploy/deploy.sh            — Open port 8081 on VPS after deploy
+```
+
+**Deploy:**
+```bash
+# Redeploy to VPS
+./deploy/deploy.sh [IP]
+
+# Open admin port
+ssh root@[IP] 'ufw allow 8081/tcp'
+
+# View dashboard
+# Open browser: http://[IP]:8081
+```
+
+**Test:**
+No vitest — this is visual. Test manually:
+1. Start server locally: `npx tsx src/server/index.ts --port 8080 --admin-port 8081`
+2. Open http://localhost:8081 in browser
+3. Launch agents: `ANTHROPIC_API_KEY=... npx tsx agent/launcher.ts --server ws://localhost:8080 --fighters 2 --merchants 1 --monsters 1`
+4. Watch the dashboard — agents should appear as colored dots, moving, fighting, gathering
+5. Verify: event feed scrolls, agent list updates, hover shows vision radius
+6. `npx tsc --noEmit` must pass
 
 ---
 
