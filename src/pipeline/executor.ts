@@ -6,6 +6,7 @@ import type {
   ValidatedAction,
   ActionParams,
   Agent,
+  Alliance,
   ChatMessage,
   CombatPair,
   StateChange,
@@ -88,10 +89,15 @@ export class ActionExecutor {
         return this.executeTalk(action.params, agent, world, tick);
       case 'idle':
         return this.executeIdle(agent);
+      case 'form_alliance':
+        return this.executeFormAlliance(action.params, agent, world, tick);
+      case 'join_alliance':
+        return this.executeJoinAlliance(action.params, agent, world, tick);
+      case 'leave_alliance':
+        return this.executeLeaveAlliance(agent, world, tick);
       default:
         // Other actions (craft, trade, plant, water, feed, climb,
-        // form_alliance, join_alliance, inspect) are handled by
-        // their respective Phase 3 processors.
+        // inspect) are handled by their respective Phase 3 processors.
         return { changes: [], spawns: [] };
     }
   }
@@ -247,6 +253,105 @@ export class ActionExecutor {
   private executeIdle(_agent: Agent): SingleExecutionResult {
     // No-op
     return { changes: [], spawns: [] };
+  }
+
+  private executeFormAlliance(
+    params: Extract<ActionParams, { type: 'form_alliance' }>,
+    agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    const changes: StateChange[] = [];
+
+    const alliance: Alliance = {
+      name: params.name,
+      founder: agent.id,
+      members: new Set([agent.id]),
+      createdAt: tick,
+    };
+
+    world.alliances.set(params.name, alliance);
+
+    const oldAlliance = agent.alliance;
+    agent.alliance = params.name;
+
+    changes.push({
+      entityId: agent.id,
+      field: 'alliance',
+      oldValue: oldAlliance,
+      newValue: params.name,
+    });
+
+    world.tickEvents.push({
+      type: 'alliance_formed',
+      name: params.name,
+      founder: agent.id,
+    });
+
+    return { changes, spawns: [] };
+  }
+
+  private executeJoinAlliance(
+    params: Extract<ActionParams, { type: 'join_alliance' }>,
+    agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    const changes: StateChange[] = [];
+
+    const alliance = world.alliances.get(params.name);
+    if (!alliance) return { changes: [], spawns: [] };
+
+    alliance.members.add(agent.id);
+
+    const oldAlliance = agent.alliance;
+    agent.alliance = params.name;
+
+    changes.push({
+      entityId: agent.id,
+      field: 'alliance',
+      oldValue: oldAlliance,
+      newValue: params.name,
+    });
+
+    world.tickEvents.push({
+      type: 'alliance_joined',
+      name: params.name,
+      agentId: agent.id,
+    });
+
+    return { changes, spawns: [] };
+  }
+
+  private executeLeaveAlliance(
+    agent: Agent,
+    world: WorldState,
+    _tick: Tick,
+  ): SingleExecutionResult {
+    const changes: StateChange[] = [];
+
+    const allianceName = agent.alliance;
+    if (!allianceName) return { changes: [], spawns: [] };
+
+    const alliance = world.alliances.get(allianceName);
+    if (alliance) {
+      alliance.members.delete(agent.id);
+      // If alliance is empty, remove it
+      if (alliance.members.size === 0) {
+        world.alliances.delete(allianceName);
+      }
+    }
+
+    agent.alliance = null;
+
+    changes.push({
+      entityId: agent.id,
+      field: 'alliance',
+      oldValue: allianceName,
+      newValue: null,
+    });
+
+    return { changes, spawns: [] };
   }
 
   private advanceMovement(agent: Agent, world: WorldState): void {

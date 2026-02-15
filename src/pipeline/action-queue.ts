@@ -12,7 +12,7 @@ import type {
 const VALID_ACTION_TYPES: ReadonlySet<string> = new Set<ActionType>([
   'move', 'gather', 'craft', 'attack', 'talk', 'inspect',
   'trade', 'plant', 'water', 'feed', 'climb',
-  'form_alliance', 'join_alliance', 'idle',
+  'form_alliance', 'join_alliance', 'leave_alliance', 'idle',
 ]);
 
 export class ActionQueue {
@@ -86,6 +86,8 @@ export class ActionQueue {
         return this.parseFormAllianceParams(raw);
       case 'join_alliance':
         return this.parseJoinAllianceParams(raw);
+      case 'leave_alliance':
+        return { type: 'leave_alliance' };
       case 'idle':
         return { type: 'idle' };
       default:
