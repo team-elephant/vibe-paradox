@@ -15,6 +15,7 @@ import { distance } from '../types/index.js';
 import type { WorldState } from '../server/world.js';
 import { SPAWN_POINT, WORLD_SIZE } from '../shared/constants.js';
 import { generateMessageId } from '../shared/utils.js';
+import type { ResourceProcessor } from './resource-processor.js';
 
 export interface ExecutionResult {
   stateChanges: StateChange[];
@@ -29,6 +30,13 @@ interface SingleExecutionResult {
 export class ActionExecutor {
   /** Active combat pairs tracked across ticks */
   readonly combatPairs: CombatPair[] = [];
+
+  /** Resource processor for gathering/planting/watering (set externally) */
+  private resourceProcessor: ResourceProcessor | null = null;
+
+  setResourceProcessor(rp: ResourceProcessor): void {
+    this.resourceProcessor = rp;
+  }
 
   executeBatch(
     actions: ValidatedAction[],
@@ -86,10 +94,14 @@ export class ActionExecutor {
         return this.executeAttack(action.params, agent, world, tick);
       case 'talk':
         return this.executeTalk(action.params, agent, world, tick);
+      case 'plant':
+        return this.executePlant(action.params, agent, world, tick);
+      case 'water':
+        return this.executeWater(action.params, agent, world, tick);
       case 'idle':
         return this.executeIdle(agent);
       default:
-        // Other actions (craft, trade, plant, water, feed, climb,
+        // Other actions (craft, trade, feed, climb,
         // form_alliance, join_alliance, inspect) are handled by
         // their respective Phase 3 processors.
         return { changes: [], spawns: [] };
@@ -147,6 +159,11 @@ export class ActionExecutor {
     // Mark resource as being gathered
     const oldResourceState = resource.state;
     resource.state = 'being_gathered';
+
+    // Start gathering progress via resource processor
+    if (this.resourceProcessor) {
+      this.resourceProcessor.startGathering(agent.id, resource.id, resource);
+    }
 
     changes.push({
       entityId: agent.id,
@@ -225,6 +242,30 @@ export class ActionExecutor {
 
     world.tickMessages.push(msg);
 
+    return { changes: [], spawns: [] };
+  }
+
+  private executePlant(
+    params: Extract<ActionParams, { type: 'plant' }>,
+    agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    if (this.resourceProcessor) {
+      this.resourceProcessor.plantSapling(agent.id, { x: params.x, y: params.y }, world, tick);
+    }
+    return { changes: [], spawns: [] };
+  }
+
+  private executeWater(
+    params: Extract<ActionParams, { type: 'water' }>,
+    _agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    if (this.resourceProcessor) {
+      this.resourceProcessor.waterSapling({ x: params.x, y: params.y }, world, tick);
+    }
     return { changes: [], spawns: [] };
   }
 
