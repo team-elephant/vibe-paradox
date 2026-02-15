@@ -6,6 +6,7 @@ import type { Database } from './db.js';
 import type { ActionQueue } from '../pipeline/action-queue.js';
 import type { ActionValidator } from '../pipeline/validator.js';
 import type { ActionExecutor, ExecutionResult } from '../pipeline/executor.js';
+import type { BehemothProcessor } from '../pipeline/behemoth-processor.js';
 import type { StateBroadcaster } from './broadcaster.js';
 import type { GameWebSocketServer } from './ws-server.js';
 import { TICK_RATE_MS, SNAPSHOT_INTERVAL_TICKS } from '../shared/constants.js';
@@ -16,6 +17,7 @@ export class TickLoop {
   private validator: ActionValidator;
   private executor: ActionExecutor;
   private db: Database;
+  private behemothProcessor: BehemothProcessor | null = null;
   private broadcaster: StateBroadcaster | null = null;
   private wsServer: GameWebSocketServer | null = null;
 
@@ -33,6 +35,10 @@ export class TickLoop {
     this.validator = validator;
     this.executor = executor;
     this.db = db;
+  }
+
+  setBehemothProcessor(processor: BehemothProcessor): void {
+    this.behemothProcessor = processor;
   }
 
   setBroadcaster(broadcaster: StateBroadcaster, wsServer: GameWebSocketServer): void {
@@ -75,8 +81,14 @@ export class TickLoop {
     // 7. Process resource regeneration / growth (Phase 3 — placeholder)
     // this.resourceProcessor.tick(this.world, tick);
 
-    // 8. Process behemoth lifecycle (Phase 3 — placeholder)
-    // this.behemothProcessor.tick(this.world, tick);
+    // 8. Process behemoth lifecycle
+    if (this.behemothProcessor) {
+      const throwOffs = this.behemothProcessor.tick(this.world, tick);
+      // Executor handles agent mutations from behemoth throw-offs
+      if (throwOffs.length > 0) {
+        this.executor.processThrowOffs(throwOffs, this.world, tick);
+      }
+    }
 
     // 9. Check respawns
     this.executor.processRespawns(this.world, tick);

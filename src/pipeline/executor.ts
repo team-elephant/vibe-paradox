@@ -13,7 +13,9 @@ import type {
 } from '../types/index.js';
 import { distance } from '../types/index.js';
 import type { WorldState } from '../server/world.js';
-import { SPAWN_POINT, WORLD_SIZE } from '../shared/constants.js';
+import type { BehemothProcessor } from './behemoth-processor.js';
+import type { ThrowOffResult } from './behemoth-processor.js';
+import { SPAWN_POINT, WORLD_SIZE, BEHEMOTH_THROW_DAMAGE_PERCENT, RESPAWN_TICKS } from '../shared/constants.js';
 import { generateMessageId } from '../shared/utils.js';
 
 export interface ExecutionResult {
@@ -29,6 +31,9 @@ interface SingleExecutionResult {
 export class ActionExecutor {
   /** Active combat pairs tracked across ticks */
   readonly combatPairs: CombatPair[] = [];
+
+  /** Behemoth processor reference (set externally) */
+  behemothProcessor: BehemothProcessor | null = null;
 
   executeBatch(
     actions: ValidatedAction[],
@@ -69,6 +74,25 @@ export class ActionExecutor {
     }
   }
 
+  /** Apply throw-off damage to agents ejected from waking behemoths */
+  processThrowOffs(throwOffs: ThrowOffResult[], world: WorldState, tick: Tick): void {
+    for (const throwOff of throwOffs) {
+      for (const agentId of throwOff.agentIds) {
+        const agent = world.agents.get(agentId);
+        if (!agent) continue;
+
+        const damage = Math.floor(agent.stats.maxHealth * BEHEMOTH_THROW_DAMAGE_PERCENT);
+        agent.stats.health = Math.max(0, agent.stats.health - damage);
+        agent.status = 'idle';
+
+        if (agent.stats.health <= 0) {
+          agent.status = 'dead';
+          agent.respawnTick = tick + RESPAWN_TICKS;
+        }
+      }
+    }
+  }
+
   private executeSingle(
     action: ValidatedAction,
     world: WorldState,
@@ -86,10 +110,14 @@ export class ActionExecutor {
         return this.executeAttack(action.params, agent, world, tick);
       case 'talk':
         return this.executeTalk(action.params, agent, world, tick);
+      case 'feed':
+        return this.executeFeed(action.params, agent, world, tick);
+      case 'climb':
+        return this.executeClimb(action.params, agent, world, tick);
       case 'idle':
         return this.executeIdle(agent);
       default:
-        // Other actions (craft, trade, plant, water, feed, climb,
+        // Other actions (craft, trade, plant, water,
         // form_alliance, join_alliance, inspect) are handled by
         // their respective Phase 3 processors.
         return { changes: [], spawns: [] };
@@ -226,6 +254,84 @@ export class ActionExecutor {
     world.tickMessages.push(msg);
 
     return { changes: [], spawns: [] };
+  }
+
+  private executeFeed(
+    params: Extract<ActionParams, { type: 'feed' }>,
+    agent: Agent,
+    world: WorldState,
+    tick: Tick,
+  ): SingleExecutionResult {
+    const changes: StateChange[] = [];
+
+    const behemoth = world.behemoths.get(params.behemothId);
+    if (!behemoth) return { changes: [], spawns: [] };
+
+    // Remove food item from inventory
+    const foodIndex = agent.inventory.findIndex((i) => i.id === params.itemId);
+    if (foodIndex === -1) return { changes: [], spawns: [] };
+
+    const foodItem = agent.inventory[foodIndex]!;
+    const oldQty = foodItem.quantity;
+    foodItem.quantity--;
+    if (foodItem.quantity <= 0) {
+      agent.inventory.splice(foodIndex, 1);
+    }
+
+    changes.push({
+      entityId: agent.id,
+      field: 'inventory',
+      oldValue: params.itemId + ':' + oldQty,
+      newValue: params.itemId + ':' + (oldQty - 1),
+    });
+
+    // Feed the behemoth via processor
+    if (this.behemothProcessor) {
+      this.behemothProcessor.feedBehemoth(behemoth, tick);
+    } else {
+      // Fallback: direct feed tracking
+      behemoth.fedAmount++;
+    }
+
+    const oldFed = behemoth.fedAmount - 1;
+    changes.push({
+      entityId: behemoth.id,
+      field: 'fedAmount',
+      oldValue: oldFed,
+      newValue: behemoth.fedAmount,
+    });
+
+    return { changes, spawns: [] };
+  }
+
+  private executeClimb(
+    params: Extract<ActionParams, { type: 'climb' }>,
+    agent: Agent,
+    world: WorldState,
+    _tick: Tick,
+  ): SingleExecutionResult {
+    const changes: StateChange[] = [];
+
+    const behemoth = world.behemoths.get(params.behemothId);
+    if (!behemoth) return { changes: [], spawns: [] };
+    if (behemoth.status !== 'unconscious') return { changes: [], spawns: [] };
+
+    const oldStatus = agent.status;
+    agent.status = 'climbing';
+
+    // Register climber with behemoth processor
+    if (this.behemothProcessor) {
+      this.behemothProcessor.registerClimber(behemoth.id, agent.id);
+    }
+
+    changes.push({
+      entityId: agent.id,
+      field: 'status',
+      oldValue: oldStatus,
+      newValue: 'climbing',
+    });
+
+    return { changes, spawns: [] };
   }
 
   private executeIdle(_agent: Agent): SingleExecutionResult {
