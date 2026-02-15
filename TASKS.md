@@ -782,6 +782,85 @@ README.md (NEW)
 
 ---
 
+### TASK-022: Agent Brain — LLM Wrapper `[ ]`
+**Depends on:** TASK-012 (CLI client)
+**Parallel-safe with:** Any Phase 3/4 task
+
+**Do:**
+1. Create `agent/config.ts` — `AgentConfig` interface:
+   - serverUrl, name, role
+   - LLM settings: apiKey (from `ANTHROPIC_API_KEY` env), model (default `claude-sonnet-4-5-20250929`), maxTokens (200), temperature (0.7)
+   - Decision tuning: idleTimeout (5 ticks), maxEventsInPrompt (5), maxMessagesInPrompt (3), decisionCooldown (2 ticks)
+2. Create `agent/state-buffer.ts` with class `StateBuffer`:
+   - `push(update: TickUpdateData): void` — buffers last 10 tick states
+   - `getBuffered(): BufferedState` — returns current, previous, recentEvents, recentMessages, ticksSinceLastAction, ticksSinceLastDecision, currentPlan
+   - `shouldTriggerDecision(): boolean` — meaningful change detection:
+     - New entities appeared/disappeared nearby
+     - Health changed (took damage)
+     - Status changed (arrived, finished gathering, etc.)
+     - Received messages or events
+     - Idle timeout (no action in last N ticks)
+   - Tracks `currentPlan` (natural language — what the agent is doing and why)
+3. Create `agent/prompt-assembler.ts`:
+   - `assemblePrompt(state: BufferedState, role: AgentRole): { system: string; user: string }`
+   - System prompt per role (fighter/merchant/monster): game rules, action space, constraints, decision format
+   - User prompt: tick, status, inventory, nearby entities, recent events/messages, current plan
+   - Total prompt budget: ~2000 tokens (system ~800, state ~600, events ~300, format ~300)
+4. Create role-specific prompt templates in `agent/prompts/`:
+   - `agent/prompts/system.ts` — base system prompt (game rules, action format)
+   - `agent/prompts/fighter.ts` — fighter priorities (kill monsters, mine gold, trade for gear, behemoth raids)
+   - `agent/prompts/merchant.ts` — merchant priorities (gather logs, craft, trade, plant trees, mine behemoth ore)
+   - `agent/prompts/monster.ts` — monster priorities (eat NPCs, ambush humans, avoid groups, evolve, survive)
+5. Create `agent/action-parser.ts`:
+   - `parseDecision(llmResponse: string): { action: ActionType; params: Record<string, any>; plan: string } | null`
+   - Handle: raw JSON, markdown-wrapped JSON, mixed text with JSON
+   - Validate action type is known
+   - Return null on failure (brain sends idle)
+6. Create `agent/brain.ts` with class `AgentBrain`:
+   - `onTickUpdate(update: TickUpdateData): Promise<void>` — buffer state, check trigger, decide
+   - Guards against stacking LLM calls (`decisionInFlight` flag)
+   - Calls LLM via Anthropic API (claude-sonnet-4-5-20250929, max_tokens 200, temperature 0.7)
+   - Parses response → sends action or idle
+   - Stores plan from each decision for context continuity
+7. Create `agent/index.ts` — entry point:
+   - CLI: `npx tsx agent/index.ts --server ws://localhost:8080 --name Fighter1 --role fighter`
+   - Env: `ANTHROPIC_API_KEY`, optional `VIBE_PARADOX_MODEL`
+   - Spawns CLI client (`cli/index.ts`) as child process
+   - Reads stdout line-by-line → parses JSON → feeds tick updates to brain
+   - Brain actions written to CLI stdin as JSON
+8. Create `agent/launcher.ts` — multi-agent launcher:
+   - CLI: `npx tsx agent/launcher.ts --server ws://localhost:8080 --fighters 3 --merchants 2 --monsters 1`
+   - Spawns N agent processes with auto-generated names (Fighter_001, Merchant_001, etc.)
+
+**Files created:**
+```
+agent/index.ts
+agent/brain.ts
+agent/state-buffer.ts
+agent/prompt-assembler.ts
+agent/action-parser.ts
+agent/config.ts
+agent/launcher.ts
+agent/prompts/system.ts
+agent/prompts/fighter.ts
+agent/prompts/merchant.ts
+agent/prompts/monster.ts
+tests/agent-brain.test.ts
+```
+
+**Test:**
+- state-buffer: `shouldTriggerDecision()` returns true on health change, new nearby entity, status change, idle timeout
+- state-buffer: `shouldTriggerDecision()` returns false when nothing meaningful changed
+- action-parser: parses clean JSON `{"action":"move","params":{"x":100,"y":200},"plan":"exploring"}`
+- action-parser: parses markdown-wrapped JSON (```json ... ```)
+- action-parser: returns null for unparseable garbage
+- action-parser: handles extra fields gracefully (doesn't crash)
+- prompt-assembler: output contains required sections (status, inventory, nearby, events)
+- prompt-assembler: stays under ~2000 token budget
+- Integration: mock LLM → state in → action out through full brain loop
+
+---
+
 ## Parallelization Map
 
 ```
@@ -817,4 +896,8 @@ Phase 3 (fully parallel):
 Phase 4:
 
   TASK-020 + TASK-021 (parallel, anytime after Phase 2)
+
+Phase 5 (Agent Intelligence):
+
+  TASK-022 (after TASK-012, parallel with Phase 3/4)
 ```
