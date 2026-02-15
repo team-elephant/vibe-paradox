@@ -11,6 +11,7 @@ import type { ResourceProcessor } from '../pipeline/resource-processor.js';
 import type { StateBroadcaster } from './broadcaster.js';
 import type { GameWebSocketServer } from './ws-server.js';
 import type { EconomyProcessor } from '../pipeline/economy-processor.js';
+import type { MonsterProcessor } from '../pipeline/monster-processor.js';
 import { TICK_RATE_MS, SNAPSHOT_INTERVAL_TICKS } from '../shared/constants.js';
 
 export class TickLoop {
@@ -24,6 +25,7 @@ export class TickLoop {
   private economyProcessor: EconomyProcessor | null = null;
   private broadcaster: StateBroadcaster | null = null;
   private wsServer: GameWebSocketServer | null = null;
+  private monsterProcessor: MonsterProcessor | null = null;
 
   private tickInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -56,6 +58,10 @@ export class TickLoop {
   setBroadcaster(broadcaster: StateBroadcaster, wsServer: GameWebSocketServer): void {
     this.broadcaster = broadcaster;
     this.wsServer = wsServer;
+  }
+
+  setMonsterProcessor(monsterProcessor: MonsterProcessor): void {
+    this.monsterProcessor = monsterProcessor;
   }
 
   start(): void {
@@ -93,8 +99,10 @@ export class TickLoop {
       this.executor.cleanupCombatPairs();
     }
 
-    // 6. Process NPC monster AI (Phase 3 — placeholder)
-    // this.monsterProcessor.tick(this.world, tick);
+    // 6. Process NPC monster AI
+    if (this.monsterProcessor) {
+      this.monsterProcessor.tick(this.world, tick);
+    }
 
     // 7. Process resource regeneration / growth
     if (this.resourceProcessor) {
@@ -117,8 +125,10 @@ export class TickLoop {
     // 9. Check respawns
     this.executor.processRespawns(this.world, tick);
 
-    // 10. NPC spawner balance check (Phase 3 — placeholder)
-    // this.monsterProcessor.spawnCheck(this.world, tick);
+    // 10. NPC spawner balance check
+    if (this.monsterProcessor) {
+      this.monsterProcessor.spawnCheck(this.world, tick);
+    }
 
     // 11. Build tick result
     const tickResult: TickResult = {
