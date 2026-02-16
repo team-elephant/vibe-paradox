@@ -1121,7 +1121,7 @@ tests/agent-brain.test.ts
 
 ---
 
-### TASK-023: Agent Memory — Persistent Memory Across Decisions `[ ]`
+### TASK-023: Agent Memory — Persistent Memory Across Decisions `[x]`
 **Depends on:** TASK-022 (agent brain)
 **Parallel-safe with:** Any Phase 3/4 task
 
