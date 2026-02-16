@@ -1121,6 +1121,62 @@ tests/agent-brain.test.ts
 
 ---
 
+### TASK-023: Agent Memory — Persistent Memory Across Decisions `[ ]`
+**Depends on:** TASK-022 (agent brain)
+**Parallel-safe with:** Any Phase 3/4 task
+
+**Do:**
+1. Create `agent/memory.ts` with class `AgentMemory`:
+   - Stores: last 20 decisions with outcomes (did the action succeed or get rejected?)
+   - Tracks: agents met (name, role, alliance, last interaction tick)
+   - Tracks: resources found (position, type)
+   - Tracks: threats encountered (who attacked, where, outcome)
+   - Tracks: trades completed (who, what, price)
+   - Tracks: deaths (where, what killed me — for fighters/merchants to avoid dangerous areas)
+   - `recordDecision(action, outcome): void` — append to decision history, truncate to 20
+   - `recordAgentMet(name, role, alliance, tick): void`
+   - `recordResourceFound(position, type): void`
+   - `recordThreat(attacker, position, outcome): void`
+   - `recordTrade(partner, gave, received): void`
+   - `recordDeath(position, killer): void`
+   - `serialize(): string` — JSON for file persistence
+   - `static load(filePath: string): AgentMemory` — load from file
+   - `save(filePath: string): void` — save to file (one file per agent in `data/` directory)
+   - Memory persists across agent restarts
+
+2. Update `agent/prompt-assembler.ts`:
+   - Add memory section to user prompt:
+     `"MEMORY: Known agents: [...], Known resource locations: [...], Past trades: [...], Threats: [...]"`
+   - Add strategic context: `"You have died 2 times at position (600, 400) — avoid that area"`
+   - Keep total prompt under 2500 tokens (was 2000, budget +500 for memory)
+
+3. Update `agent/brain.ts`:
+   - After each decision + tick result, update memory:
+     - Action succeeded → record outcome
+     - New agent seen in nearby entities → add to known agents
+     - Resource found in nearby entities → add to known locations
+     - Took damage → record threat
+     - Trade completed → record trade history
+     - Agent died → record death location and killer
+   - Load memory on startup, save after each decision
+
+**Files touched:**
+```
+agent/memory.ts (NEW)
+agent/prompt-assembler.ts (UPDATE — add memory section, raise token budget to 2500)
+agent/brain.ts (UPDATE — load/save memory, update memory after each decision)
+tests/agent-memory.test.ts (NEW)
+```
+
+**Test:**
+- Memory serialization roundtrip: create memory, add data, serialize, load, verify all data intact
+- Memory truncation: add 25 decisions, verify only last 20 kept
+- Prompt stays under 2500 token budget with full memory (20 decisions, 10 known agents, 10 resources, 5 threats, 5 trades, 3 deaths)
+- Death tracking: record 2 deaths at same position, verify memory contains both
+- `npx vitest run` and `npx tsc --noEmit` pass
+
+---
+
 ## Parallelization Map
 
 ```
@@ -1159,5 +1215,5 @@ Phase 4:
 
 Phase 5 (Agent Intelligence):
 
-  TASK-022 (after TASK-012, parallel with Phase 3/4)
+  TASK-022 ──► TASK-023 (memory depends on brain)
 ```
