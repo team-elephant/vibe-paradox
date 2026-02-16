@@ -1177,6 +1177,37 @@ tests/agent-memory.test.ts (NEW)
 
 ---
 
+### TASK-024: Agent Cost Tracking — LLM Usage Logging `[x]`
+**Depends on:** TASK-022 (agent brain)
+**Parallel-safe with:** Any Phase 3/4 task
+
+**Do:**
+1. In `agent/brain.ts`, after each LLM call, extract `response.usage` (input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens)
+2. Add a simple cost tracker to `AgentBrain`:
+   - `totalInputTokens`, `totalOutputTokens`, `totalCacheReadTokens`, `totalCacheWriteTokens`, `totalDecisions`
+   - Increment after each call
+3. Every 20 decisions, log a summary line to stderr:
+   `"[Fighter_001] 20 decisions | input: 12,400 tokens | output: 1,800 tokens | cache hits: 9,200 | est cost: $0.008"`
+4. On process exit (SIGINT/SIGTERM), log final totals for each agent.
+
+Cost estimation (Sonnet pricing):
+- Input: $3/MTok
+- Output: $15/MTok
+- Cache read: $0.30/MTok
+- Cache write: $3.75/MTok
+
+Keep it simple — just `console.error` logging, no database. We just want to see the bill in the morning.
+
+**Files touched:**
+```
+agent/brain.ts (UPDATE — add cost tracker, usage logging, exit handler)
+```
+
+**Test:**
+- `npx tsc --noEmit` passes
+
+---
+
 ## Parallelization Map
 
 ```
@@ -1216,4 +1247,5 @@ Phase 4:
 Phase 5 (Agent Intelligence):
 
   TASK-022 ──► TASK-023 (memory depends on brain)
+           ──► TASK-024 (cost tracking, depends on brain)
 ```

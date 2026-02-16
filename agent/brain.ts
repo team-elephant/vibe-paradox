@@ -15,6 +15,80 @@ export interface BrainAction {
   tick: number;
 }
 
+// --- Cost Tracking (Sonnet pricing) ---
+const COST_PER_MTOK = {
+  input: 3.0,
+  output: 15.0,
+  cacheRead: 0.30,
+  cacheWrite: 3.75,
+} as const;
+
+const COST_LOG_INTERVAL = 20;
+
+interface UsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  decisions: number;
+}
+
+function estimateCost(t: UsageTotals): number {
+  return (
+    (t.inputTokens / 1_000_000) * COST_PER_MTOK.input +
+    (t.outputTokens / 1_000_000) * COST_PER_MTOK.output +
+    (t.cacheReadTokens / 1_000_000) * COST_PER_MTOK.cacheRead +
+    (t.cacheWriteTokens / 1_000_000) * COST_PER_MTOK.cacheWrite
+  );
+}
+
+function formatNum(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
+// Global registry so exit handler can log all agents
+const activeAgents = new Map<string, { name: string; usage: UsageTotals }>();
+let exitHandlerRegistered = false;
+
+function registerExitHandler(): void {
+  if (exitHandlerRegistered) return;
+  exitHandlerRegistered = true;
+
+  const logFinalTotals = (): void => {
+    if (activeAgents.size === 0) return;
+    process.stderr.write('\n=== LLM Cost Summary ===\n');
+    let grandTotal = 0;
+    for (const [, agent] of activeAgents) {
+      const cost = estimateCost(agent.usage);
+      grandTotal += cost;
+      process.stderr.write(
+        `[${agent.name}] ${agent.usage.decisions} decisions | ` +
+        `input: ${formatNum(agent.usage.inputTokens)} | ` +
+        `output: ${formatNum(agent.usage.outputTokens)} | ` +
+        `cache read: ${formatNum(agent.usage.cacheReadTokens)} | ` +
+        `cache write: ${formatNum(agent.usage.cacheWriteTokens)} | ` +
+        `est cost: $${cost.toFixed(4)}\n`,
+      );
+    }
+    if (activeAgents.size > 1) {
+      process.stderr.write(`Total est cost: $${grandTotal.toFixed(4)}\n`);
+    }
+    process.stderr.write('========================\n');
+  };
+
+  process.on('SIGINT', () => {
+    logFinalTotals();
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    logFinalTotals();
+    process.exit(0);
+  });
+  process.on('exit', () => {
+    logFinalTotals();
+  });
+}
+
 export class AgentBrain {
   private stateBuffer: StateBuffer;
   private client: Anthropic;
@@ -26,6 +100,13 @@ export class AgentBrain {
   private lastSentAction: { action: string; params: Record<string, unknown>; plan: string; sentTick: number } | null = null;
   private static readonly CONFIRM_TIMEOUT_TICKS = 5;
   private previousHealth: number | null = null;
+  private usage: UsageTotals = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    decisions: 0,
+  };
 
   constructor(config: AgentConfig, sendAction: (action: BrainAction) => void) {
     this.config = config;
@@ -36,6 +117,10 @@ export class AgentBrain {
     // Load persistent memory
     this.memoryPath = join('data', `${config.name}.memory.json`);
     this.memory = AgentMemory.load(this.memoryPath);
+
+    // Register for cost tracking on exit
+    activeAgents.set(config.name, { name: config.name, usage: this.usage });
+    registerExitHandler();
   }
 
   async onTickUpdate(update: TickUpdateData): Promise<void> {
@@ -71,6 +156,26 @@ export class AgentBrain {
         system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: user }],
       });
+
+      // Track token usage
+      const u = response.usage;
+      this.usage.inputTokens += u.input_tokens;
+      this.usage.outputTokens += u.output_tokens;
+      this.usage.cacheReadTokens += u.cache_read_input_tokens ?? 0;
+      this.usage.cacheWriteTokens += u.cache_creation_input_tokens ?? 0;
+      this.usage.decisions++;
+
+      // Log cost summary every COST_LOG_INTERVAL decisions
+      if (this.usage.decisions % COST_LOG_INTERVAL === 0) {
+        const cost = estimateCost(this.usage);
+        process.stderr.write(
+          `[${this.config.name}] ${this.usage.decisions} decisions | ` +
+          `input: ${formatNum(this.usage.inputTokens)} tokens | ` +
+          `output: ${formatNum(this.usage.outputTokens)} tokens | ` +
+          `cache hits: ${formatNum(this.usage.cacheReadTokens)} | ` +
+          `est cost: $${cost.toFixed(4)}\n`,
+        );
+      }
 
       const text = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
