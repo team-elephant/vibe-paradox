@@ -871,7 +871,7 @@ async function fetchMyAgents() {
     const res = await fetch('/api/agents', { headers: authHeaders() });
     if (res.ok) {
       const data = await res.json();
-      myAgents = data.agents || [];
+      myAgents = Array.isArray(data) ? data : [];
       updateAgentList();
       updateCostPanel();
       updateApiKeyStatus();
