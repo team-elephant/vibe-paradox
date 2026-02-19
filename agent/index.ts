@@ -1,4 +1,6 @@
 // agent/index.ts — Entry point: spawns CLI as child process, wires stdin/stdout to brain
+//
+// Feature flag: AGENT_BRAIN_VERSION=1 uses v1 (LLM every tick), =2 uses pipeline (default)
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
@@ -6,6 +8,12 @@ import { Command } from 'commander';
 import type { AgentRole, ServerMessage, TickUpdateData } from '../src/types/index.js';
 import { loadConfig } from './config.js';
 import { AgentBrain } from './brain.js';
+import { AgentBrain as AgentBrainV1 } from './brain-v1.js';
+
+interface Brain {
+  onTickUpdate(update: TickUpdateData): Promise<void>;
+  onActionRejected(action: string, reason: string): void;
+}
 
 const program = new Command();
 
@@ -39,11 +47,23 @@ program
       stdio: ['pipe', 'pipe', 'inherit'],
     });
 
-    // Wire brain actions → child stdin
-    const brain = new AgentBrain(config, (action) => {
-      const line = JSON.stringify(action) + '\n';
-      child.stdin.write(line);
-    });
+    // Feature flag: AGENT_BRAIN_VERSION (default: "2")
+    const brainVersion = process.env.AGENT_BRAIN_VERSION ?? '2';
+    let brain: Brain;
+
+    if (brainVersion === '1') {
+      process.stderr.write(`[${config.name}] Using brain v1 (LLM every tick)\n`);
+      brain = new AgentBrainV1(config, (action) => {
+        const line = JSON.stringify(action) + '\n';
+        child.stdin.write(line);
+      });
+    } else {
+      process.stderr.write(`[${config.name}] Using brain v2 (pipeline)\n`);
+      brain = new AgentBrain(config, (action) => {
+        const line = JSON.stringify(action) + '\n';
+        child.stdin.write(line);
+      });
+    }
 
     // Wire child stdout → brain
     const rl = createInterface({ input: child.stdout, terminal: false });

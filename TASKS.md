@@ -9,7 +9,7 @@
 ## TRACK A — Agent Brain v2
 
 ### TASK-A01: Perception Stage
-- **Status:** READY
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Description:** Create delta detection between ticks. Compare previous and current world state, return list of what changed (new threats, HP changes, inventory changes, plan step completion/failure).
@@ -29,7 +29,7 @@
 ---
 
 ### TASK-A02: Salience Gate + Drives
-- **Status:** READY
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Depends on:** A01
@@ -53,7 +53,7 @@
 ---
 
 ### TASK-A03: Router + Plan Executor
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Depends on:** A02
@@ -80,7 +80,7 @@
 ---
 
 ### TASK-A04: Planner (LLM) + Memory
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Depends on:** A03
@@ -109,7 +109,7 @@
 ---
 
 ### TASK-A05: Wire Pipeline into Brain
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Depends on:** A04
