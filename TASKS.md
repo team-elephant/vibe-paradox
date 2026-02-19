@@ -255,7 +255,7 @@
 ---
 
 ### TASK-A07: Code Review Fixes — Brain Pipeline Bugs
-- **Status:** IN_PROGRESS
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Depends on:** A05
