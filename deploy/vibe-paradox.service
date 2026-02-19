@@ -11,6 +11,7 @@ ExecStart=/home/vibe/.nvm/versions/node/v20.20.0/bin/node dist/src/server/index.
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
+Environment=ENCRYPTION_KEY=738d5cbdb23fa5ae0cf0ea8a978fb1959b0d45aaff93b8a4823ecf3a7be7f949
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=vibe-paradox

@@ -240,7 +240,7 @@
 ---
 
 ### TASK-B04: Deploy + Test
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** Medium
 - **Track:** B
 - **Depends on:** B03
