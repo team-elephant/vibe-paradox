@@ -9,7 +9,7 @@
 ## TRACK A — Agent Brain v2
 
 ### TASK-A01: Perception Stage
-- **Status:** READY
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Description:** Create delta detection between ticks. Compare previous and current world state, return list of what changed (new threats, HP changes, inventory changes, plan step completion/failure).
