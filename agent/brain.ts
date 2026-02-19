@@ -184,13 +184,7 @@ export class AgentBrain {
   async onTickUpdate(update: TickUpdateData): Promise<void> {
     this.usage.tickCount++;
 
-    // Don't stack LLM calls
-    if (this.planInFlight) {
-      this.prevState = update;
-      return;
-    }
-
-    // --- Stage 1: Perception ---
+    // --- Stage 1: Perception (always runs, even during planInFlight/death) ---
     const currentPlanStep = this.executor.currentStep ?? undefined;
     const perceptionInput: PerceptionInput = {
       prev: this.prevState,
@@ -206,10 +200,16 @@ export class AgentBrain {
     this.updateDrivesContext(update, perceptions);
     this.drives = updateDrives(this.drives, update, perceptions, this.drivesContext);
 
-    // Dead agents: run perception + drives (above) so death is tracked, but don't act
+    // Dead agents: track death in memory/drives but don't act
     if (update.self.health <= 0) {
       this.memory.logPerceptions(perceptions, update.tick);
       this.executor.clearPlan();
+      this.prevState = update;
+      return;
+    }
+
+    // Don't stack LLM calls — but perception/drives already ran above
+    if (this.planInFlight) {
       this.prevState = update;
       return;
     }
