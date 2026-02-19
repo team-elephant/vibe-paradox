@@ -181,7 +181,7 @@
 ---
 
 ### TASK-B02: Agent Management API
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** B
 - **Depends on:** B01

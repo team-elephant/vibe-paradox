@@ -21,6 +21,8 @@ import { BehemothProcessor } from '../pipeline/behemoth-processor.js';
 import { AdminServer } from './admin.js';
 import { UsersDatabase } from './users-db.js';
 import { AuthRouter } from './auth.js';
+import { AgentApiRouter } from './agent-api.js';
+import { AgentSpawner } from './spawner.js';
 
 // --- CLI arg parsing (simple, no commander needed for server) ---
 
@@ -151,10 +153,17 @@ tickLoop.setBroadcaster(broadcaster, wsServer);
 const adminServer = new AdminServer(adminPort);
 tickLoop.setAdminServer(adminServer);
 
-// 6c. Initialize user accounts database and auth
+// 6c. Initialize user accounts database, auth, and agent management
 const usersDb = new UsersDatabase('admin.db');
 const authRouter = new AuthRouter(usersDb);
-adminServer.setApiHandler((req, res) => authRouter.handleRequest(req, res));
+const agentSpawner = new AgentSpawner(usersDb);
+const agentApiRouter = new AgentApiRouter(usersDb, authRouter, agentSpawner);
+adminServer.setApiHandler(async (req, res) => {
+  // Try auth routes first, then agent routes
+  if (await authRouter.handleRequest(req, res)) return true;
+  if (await agentApiRouter.handleRequest(req, res)) return true;
+  return false;
+});
 
 // 7. Start tick loop
 tickLoop.start();
@@ -193,7 +202,11 @@ function shutdown(signal: string): void {
   // 2. Stop status logging
   clearInterval(statusInterval);
 
-  // 3. Final snapshot
+  // 3. Stop all spawned agents
+  agentSpawner.stopAll();
+  console.log('[VP] Agent processes stopped.');
+
+  // 4. Final snapshot
   console.log(`[VP] Saving final snapshot at tick ${world.tick}...`);
   db.snapshotWorld(world);
   console.log('[VP] Snapshot saved.');
