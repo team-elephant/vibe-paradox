@@ -1,0 +1,142 @@
+{
+  "_version": "1.0",
+  "_description": "Risk tiers for Vibe Paradox. Read by agents and scope-check.sh before every merge.",
+  "_updated": "2026-02-19",
+  "_lesson": "Ported from The Shopkeeper's ALIVE project. Without this, agents touch everything and create merge conflicts.",
+
+  "tiers": {
+    "high": {
+      "description": "Game engine core + agent cognitive pipeline. One wrong line breaks the world or burns API budget.",
+      "merge_requires": ["scope-check", "tests", "manual-review"],
+      "review_model": "opus",
+      "paths": [
+        "src/server/ws-server.ts",
+        "src/server/game-engine.ts",
+        "src/server/world.ts",
+        "agent/pipeline/*.ts",
+        "agent/brain.ts",
+        "agent/brain-v1.ts",
+        "agent/plan-executor.ts",
+        "agent/index.ts"
+      ]
+    },
+    "medium": {
+      "description": "Server APIs, auth, spawner, dashboard backend, agent launcher. Breakage is recoverable but costly.",
+      "merge_requires": ["scope-check", "tests"],
+      "review_model": "sonnet",
+      "paths": [
+        "src/server/admin.ts",
+        "src/server/auth.ts",
+        "src/server/users-db.ts",
+        "src/server/agent-api.ts",
+        "src/server/spawner.ts",
+        "src/server/index.ts",
+        "agent/launcher.ts",
+        "package.json",
+        "tsconfig.json",
+        "tsup.config.ts",
+        "deploy/*.sh",
+        "deploy/*.service",
+        "deploy/*.conf"
+      ]
+    },
+    "low": {
+      "description": "Dashboard UI, tests, docs, scripts, configs. Safe to iterate fast.",
+      "merge_requires": ["scope-check"],
+      "review_model": "haiku",
+      "paths": [
+        "src/server/dashboard.html",
+        "agent/pipeline/__tests__/*.ts",
+        "tests/**",
+        "scripts/*.sh",
+        "scripts/*.ts",
+        "docs/*.md",
+        "*.md",
+        ".gitignore",
+        ".env.example",
+        "TASKS.md",
+        "CLAUDE.md"
+      ]
+    }
+  },
+
+  "track_boundaries": {
+    "_description": "Hard file locks between parallel tracks. Violations are automatic failures regardless of tier.",
+    "track_a": {
+      "name": "Agent Brain v2",
+      "owns": [
+        "agent/brain.ts",
+        "agent/brain-v1.ts",
+        "agent/pipeline/*.ts",
+        "agent/pipeline/__tests__/*.ts",
+        "agent/plan-executor.ts",
+        "agent/index.ts"
+      ],
+      "forbidden": [
+        "src/server/admin.ts",
+        "src/server/auth.ts",
+        "src/server/users-db.ts",
+        "src/server/agent-api.ts",
+        "src/server/spawner.ts",
+        "src/server/dashboard.html"
+      ]
+    },
+    "track_b": {
+      "name": "Accounts + Dashboard",
+      "owns": [
+        "src/server/auth.ts",
+        "src/server/users-db.ts",
+        "src/server/agent-api.ts",
+        "src/server/spawner.ts",
+        "src/server/admin.ts",
+        "src/server/dashboard.html",
+        "src/server/index.ts"
+      ],
+      "forbidden": [
+        "agent/brain.ts",
+        "agent/brain-v1.ts",
+        "agent/pipeline/*.ts",
+        "agent/plan-executor.ts",
+        "agent/index.ts"
+      ]
+    },
+    "shared": {
+      "_description": "Files both tracks may touch — coordinate before modifying.",
+      "paths": [
+        "package.json",
+        "tsup.config.ts",
+        "agent/launcher.ts"
+      ]
+    }
+  },
+
+  "overrides": {
+    "_description": "Per-task clearance overrides. scope-check.sh reads these.",
+    "example": {
+      "task": "TASK-A01",
+      "clearance": "high",
+      "track": "track_a",
+      "reason": "Creates perception pipeline stage — high-tier files."
+    }
+  },
+
+  "task_clearances": {
+    "TASK-A01": { "clearance": "high", "track": "track_a" },
+    "TASK-A02": { "clearance": "high", "track": "track_a" },
+    "TASK-A03": { "clearance": "high", "track": "track_a" },
+    "TASK-A04": { "clearance": "high", "track": "track_a" },
+    "TASK-A05": { "clearance": "high", "track": "track_a" },
+    "TASK-A06": { "clearance": "high", "track": "track_a" },
+    "TASK-B01": { "clearance": "medium", "track": "track_b" },
+    "TASK-B02": { "clearance": "medium", "track": "track_b" },
+    "TASK-B03": { "clearance": "low", "track": "track_b" },
+    "TASK-B04": { "clearance": "medium", "track": "track_b" }
+  },
+
+  "escalation_rules": {
+    "risk_policy_changed": "If risk-policy.json itself is modified, require manual review regardless of task clearance.",
+    "claude_md_changed": "If CLAUDE.md is modified, require manual review.",
+    "game_engine_changed": "If ws-server.ts or game-engine.ts is modified, STOP and notify operator. This is the world.",
+    "track_boundary_violated": "If a track_a task touches track_b files or vice versa, HARD FAILURE. No exceptions."
+  }
+}

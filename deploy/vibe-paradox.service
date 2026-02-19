@@ -1,0 +1,19 @@
+[Unit]
+Description=Vibe Paradox Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=vibe
+Group=vibe
+WorkingDirectory=/opt/vibe-paradox
+ExecStart=/home/vibe/.nvm/versions/node/v20.20.0/bin/node dist/src/server/index.js --port 8080 --db /var/lib/vibe-paradox/world.db
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vibe-paradox
+
+[Install]
+WantedBy=multi-user.target
