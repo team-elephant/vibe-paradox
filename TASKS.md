@@ -154,7 +154,7 @@
 ## TRACK B — User Accounts + Dashboard
 
 ### TASK-B01: Database Schema + Auth
-- **Status:** READY
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** B
 - **Description:** Create user authentication system. SQLite tables for users, sessions, user_agents, cost_logs. Signup/login/logout endpoints. bcrypt passwords. Session tokens.
@@ -181,7 +181,7 @@
 ---
 
 ### TASK-B02: Agent Management API
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** B
 - **Depends on:** B01
@@ -212,7 +212,7 @@
 ---
 
 ### TASK-B03: Dashboard UI — Login + Agent Controls
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** B
 - **Depends on:** B02

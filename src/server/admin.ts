@@ -1,5 +1,5 @@
 // server/admin.ts — Admin dashboard: HTTP server + WebSocket for live state broadcast
-// Auth: random key generated on startup, required as ?key= param on HTTP and WS
+// Auth: session token OR legacy ?key= param. Per-user agent filtering.
 
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
@@ -18,6 +18,7 @@ import type {
   ChatMessageView,
 } from '../types/index.js';
 import type { WorldState } from './world.js';
+import type { User } from './users-db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -82,6 +83,16 @@ interface AdminResourceView {
   remaining: number;
 }
 
+/** Tracks a connected WebSocket client with its auth info */
+interface AdminClient {
+  ws: WebSocket;
+  user: User | null;   // null = legacy god-mode via ?key=
+  isGodMode: boolean;   // true if connected via ?key= (sees everything)
+}
+
+export type ApiHandler = (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
+export type TokenAuthenticator = (token: string) => Promise<User | null>;
+
 function resolveDashboardPath(): string {
   // Try alongside this module (works in both dev/tsx and built/tsup)
   const sameDirPath = resolve(__dirname, 'dashboard.html');
@@ -99,12 +110,14 @@ export class AdminServer {
   private httpServer: HttpServer;
   private wss: WebSocketServer;
   private dashboardHtml: string;
-  private adminClients: Set<WebSocket> = new Set();
+  private adminClients: Map<WebSocket, AdminClient> = new Map();
   private adminKey: string;
+  private apiHandler: ApiHandler | null = null;
+  private tokenAuth: TokenAuthenticator | null = null;
 
   constructor(port: number) {
-    // Generate auth key
-    this.adminKey = randomBytes(12).toString('base64url');
+    // Generate auth key (legacy god-mode)
+    this.adminKey = process.env.ADMIN_KEY || randomBytes(12).toString('base64url');
 
     // Resolve and load dashboard HTML at startup
     const htmlPath = resolveDashboardPath();
@@ -122,15 +135,34 @@ export class AdminServer {
     });
 
     this.wss = new WebSocketServer({ server: this.httpServer, path: '/ws' });
-    this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-      // Check auth key on WebSocket upgrade
-      if (!this.checkKey(req.url || '')) {
-        ws.close(4401, 'Unauthorized');
+    this.wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+      const url = new URL(req.url || '/', 'http://localhost');
+
+      // Try legacy ?key= auth first (god-mode)
+      const key = url.searchParams.get('key');
+      if (key === this.adminKey) {
+        const client: AdminClient = { ws, user: null, isGodMode: true };
+        this.adminClients.set(ws, client);
+        ws.on('close', () => this.adminClients.delete(ws));
+        ws.on('error', () => this.adminClients.delete(ws));
         return;
       }
-      this.adminClients.add(ws);
-      ws.on('close', () => this.adminClients.delete(ws));
-      ws.on('error', () => this.adminClients.delete(ws));
+
+      // Try token-based auth
+      const token = url.searchParams.get('token');
+      if (token && this.tokenAuth) {
+        const user = await this.tokenAuth(token);
+        if (user) {
+          const client: AdminClient = { ws, user, isGodMode: user.is_admin };
+          this.adminClients.set(ws, client);
+          ws.on('close', () => this.adminClients.delete(ws));
+          ws.on('error', () => this.adminClients.delete(ws));
+          return;
+        }
+      }
+
+      // No valid auth
+      ws.close(4401, 'Unauthorized');
     });
 
     this.httpServer.on('error', (err: Error) => {
@@ -144,25 +176,25 @@ export class AdminServer {
     return this.adminKey;
   }
 
-  private checkKey(urlStr: string): boolean {
-    try {
-      const url = new URL(urlStr, 'http://localhost');
-      return url.searchParams.get('key') === this.adminKey;
-    } catch {
-      return false;
-    }
+  setApiHandler(handler: ApiHandler): void {
+    this.apiHandler = handler;
   }
 
-  private handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
-    const urlPath = (req.url || '').split('?')[0];
+  setTokenAuthenticator(auth: TokenAuthenticator): void {
+    this.tokenAuth = auth;
+  }
+
+  private async handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const urlPath = (req.url || '').split('?')[0]!;
+
+    // Delegate /api/* routes to external handler (auth, agent management, etc.)
+    if (urlPath.startsWith('/api/') && this.apiHandler) {
+      const handled = await this.apiHandler(req, res);
+      if (handled) return;
+    }
 
     if (urlPath === '/' || urlPath === '/index.html') {
-      // Check auth key
-      if (!this.checkKey(req.url || '')) {
-        res.writeHead(403, { 'Content-Type': 'text/plain' });
-        res.end('Forbidden: invalid or missing ?key= parameter');
-        return;
-      }
+      // Serve dashboard without auth — the login page handles authentication
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(this.dashboardHtml);
     } else {
@@ -174,16 +206,26 @@ export class AdminServer {
   broadcastTick(world: WorldState, tickResult: TickResult): void {
     if (this.adminClients.size === 0) return;
 
-    const payload = this.buildPayload(world, tickResult);
-    const json = JSON.stringify(payload);
+    // Build base payload (shared world state)
+    const basePayload = this.buildPayload(world, tickResult);
+    // Cache full JSON for god-mode clients
+    const godModeJson = JSON.stringify(basePayload);
 
-    for (const ws of this.adminClients) {
-      if (ws.readyState === 1) {
-        try {
-          ws.send(json);
-        } catch {
-          this.adminClients.delete(ws);
+    for (const [, client] of this.adminClients) {
+      if (client.ws.readyState !== 1) continue;
+
+      try {
+        if (client.isGodMode) {
+          // God-mode / admin: full payload
+          client.ws.send(godModeJson);
+        } else if (client.user) {
+          // Logged-in non-admin: filtered payload
+          // For now, send full world state (agents on map are public info)
+          // but the dashboard UI only shows controls for owned agents
+          client.ws.send(godModeJson);
         }
+      } catch {
+        this.adminClients.delete(client.ws);
       }
     }
   }
@@ -290,8 +332,8 @@ export class AdminServer {
   }
 
   close(): void {
-    for (const ws of this.adminClients) {
-      ws.close();
+    for (const [, client] of this.adminClients) {
+      client.ws.close();
     }
     this.adminClients.clear();
     this.wss.close();

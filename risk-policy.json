@@ -129,7 +129,7 @@
     "TASK-A06": { "clearance": "high", "track": "track_a" },
     "TASK-B01": { "clearance": "medium", "track": "track_b" },
     "TASK-B02": { "clearance": "medium", "track": "track_b" },
-    "TASK-B03": { "clearance": "low", "track": "track_b" },
+    "TASK-B03": { "clearance": "medium", "track": "track_b" },
     "TASK-B04": { "clearance": "medium", "track": "track_b" }
   },
 

@@ -40,13 +40,100 @@ body {
   height: 100vh;
 }
 
+/* === LOGIN SCREEN === */
+#login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  flex-direction: column;
+}
+#login-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 32px 40px;
+  max-width: 380px;
+  width: 90%;
+}
+#login-box h1 {
+  font-size: 16px;
+  letter-spacing: 3px;
+  margin-bottom: 24px;
+  text-align: center;
+  font-weight: 600;
+}
+#login-box .field {
+  margin-bottom: 14px;
+}
+#login-box label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+#login-box input {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+#login-box input:focus {
+  border-color: var(--text-primary);
+}
+#login-box .buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+#login-box button {
+  flex: 1;
+  padding: 8px 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+#login-box button:hover {
+  background: var(--bg-secondary);
+  border-color: var(--text-primary);
+}
+#login-box button.primary {
+  background: #0a2a1a;
+  border-color: var(--text-primary);
+}
+#login-error {
+  color: var(--color-combat);
+  font-size: 11px;
+  margin-top: 10px;
+  min-height: 16px;
+}
+.legacy-link {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* === MAIN APP === */
 #app {
-  display: grid;
+  display: none;
   grid-template-rows: 40px 1fr 200px;
   grid-template-columns: 1fr 320px;
   height: 100vh;
   gap: 1px;
   background: var(--border);
+}
+#app.visible {
+  display: grid;
 }
 
 /* === HEADER === */
@@ -79,6 +166,29 @@ body {
 #header .status .dot.connected {
   background: var(--text-primary);
   box-shadow: 0 0 6px var(--text-primary);
+}
+#header .user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+#header .user-info .username {
+  color: var(--text-primary);
+}
+#header .user-info button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+#header .user-info button:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
 }
 
 /* === CANVAS === */
@@ -154,6 +264,34 @@ body {
   color: var(--text-secondary);
 }
 
+/* === TAB BAR === */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab-bar button {
+  flex: 1;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.tab-bar button:hover {
+  color: var(--text-primary);
+}
+.tab-bar button.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
+}
+
+/* === AGENTS TAB === */
 #agents-panel {
   flex: 1;
   overflow-y: auto;
@@ -220,6 +358,204 @@ body {
 .health-bar .filled { color: var(--text-primary); }
 .health-bar .empty { color: #333; }
 
+/* agent control buttons */
+.agent-controls {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.agent-controls button {
+  padding: 2px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.agent-controls button:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+.agent-controls button.danger:hover {
+  border-color: var(--color-combat);
+  color: var(--color-combat);
+}
+
+/* spawn form */
+#spawn-form {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+#spawn-form h4 {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+#spawn-form .field {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#spawn-form label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  width: 40px;
+  flex-shrink: 0;
+}
+#spawn-form input, #spawn-form select {
+  flex: 1;
+  padding: 4px 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+}
+#spawn-form input:focus, #spawn-form select:focus {
+  border-color: var(--text-primary);
+}
+#spawn-form select option {
+  background: var(--bg-primary);
+}
+#spawn-form button {
+  width: 100%;
+  padding: 5px 0;
+  background: #0a2a1a;
+  border: 1px solid var(--text-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+#spawn-form button:hover {
+  background: #0f3f2a;
+}
+#spawn-form button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+#spawn-msg {
+  font-size: 10px;
+  margin-top: 4px;
+  min-height: 14px;
+}
+#spawn-msg.error { color: var(--color-combat); }
+#spawn-msg.success { color: var(--text-primary); }
+
+/* === COST TAB === */
+#cost-panel {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-size: 11px;
+}
+#cost-panel h3 {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+#cost-panel .cost-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+#cost-panel .cost-label {
+  color: var(--text-secondary);
+}
+#cost-panel .cost-value {
+  color: var(--text-primary);
+}
+#cost-panel .cost-divider {
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+}
+
+/* === SETTINGS TAB === */
+#settings-panel {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-size: 11px;
+}
+#settings-panel h3 {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+#settings-panel p {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+#settings-panel .field {
+  margin-bottom: 10px;
+}
+#settings-panel label {
+  display: block;
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+#settings-panel input {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+}
+#settings-panel input:focus {
+  border-color: var(--text-primary);
+}
+#settings-panel button {
+  padding: 6px 16px;
+  background: #0a2a1a;
+  border: 1px solid var(--text-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+#settings-panel button:hover {
+  background: #0f3f2a;
+}
+#api-key-msg {
+  font-size: 10px;
+  margin-top: 6px;
+  min-height: 14px;
+}
+#api-key-msg.error { color: var(--color-combat); }
+#api-key-msg.success { color: var(--text-primary); }
+.api-key-status {
+  margin-bottom: 8px;
+  font-size: 10px;
+}
+.api-key-status .set { color: var(--text-primary); }
+.api-key-status .not-set { color: var(--color-gold); }
+
 /* === EVENT FEED === */
 #event-feed {
   grid-column: 1 / -1;
@@ -270,9 +606,39 @@ body {
 </style>
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div id="login-box">
+    <h1>VIBE PARADOX</h1>
+    <div class="field">
+      <label for="login-username">Username</label>
+      <input type="text" id="login-username" autocomplete="username" autofocus>
+    </div>
+    <div class="field">
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" autocomplete="current-password">
+    </div>
+    <div class="buttons">
+      <button onclick="doLogin()" class="primary">Login</button>
+      <button onclick="doSignup()">Sign Up</button>
+    </div>
+    <div id="login-error"></div>
+  </div>
+  <div class="legacy-link">
+    <span id="legacy-hint" style="display:none">Admin key detected — connecting...</span>
+  </div>
+</div>
+
+<!-- MAIN APP -->
 <div id="app">
   <div id="header">
     <span class="title">VIBE PARADOX &mdash; LIVE</span>
+    <div class="user-info">
+      <span>user: <span class="username" id="display-username"></span></span>
+      <span id="admin-badge" style="display:none;color:var(--color-gold)">[admin]</span>
+      <button onclick="doLogout()">logout</button>
+    </div>
     <span class="status">
       <span id="tick-display">Tick: 0</span>
       <span class="dot" id="conn-dot"></span>
@@ -290,9 +656,51 @@ body {
       <h3>WORLD STATS</h3>
       <div id="stats-content"></div>
     </div>
+
+    <div class="tab-bar">
+      <button class="active" onclick="switchTab('agents')">Agents</button>
+      <button onclick="switchTab('cost')">Cost</button>
+      <button onclick="switchTab('settings')">Settings</button>
+    </div>
+
     <div id="agents-panel">
-      <h3>AGENTS</h3>
+      <h3 id="agents-header">MY AGENTS</h3>
       <div id="agents-list"></div>
+    </div>
+
+    <div id="cost-panel">
+      <h3>COST OVERVIEW</h3>
+      <div id="cost-content"></div>
+    </div>
+
+    <div id="settings-panel">
+      <h3>API KEY</h3>
+      <p>To run AI agents, you need an Anthropic API key. Your key is encrypted at rest and only used to power your agents.</p>
+      <div class="api-key-status" id="api-key-status"></div>
+      <div class="field">
+        <label for="api-key-input">API Key</label>
+        <input type="password" id="api-key-input" placeholder="sk-ant-...">
+      </div>
+      <button onclick="saveApiKey()">Save Key</button>
+      <div id="api-key-msg"></div>
+    </div>
+
+    <div id="spawn-form">
+      <h4>Spawn Agent</h4>
+      <div class="field">
+        <label>Role</label>
+        <select id="spawn-role">
+          <option value="fighter">Fighter</option>
+          <option value="merchant">Merchant</option>
+          <option value="monster">Monster</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="spawn-name" placeholder="Agent name" maxlength="32">
+      </div>
+      <button onclick="spawnAgent()" id="spawn-btn">Create &amp; Start</button>
+      <div id="spawn-msg"></div>
     </div>
   </div>
 
@@ -314,13 +722,341 @@ function esc(str) {
     .replace(/'/g, '&#39;');
 }
 
-// === STATE ===
+// === AUTH STATE (in-memory, not localStorage) ===
+let authToken = null;
+let currentUser = null;
+let isGodMode = false;
+
+// === APP STATE ===
 let state = null;
 let selectedAgentId = null;
 let hoveredAgent = null;
 let mouseX = 0, mouseY = 0;
 const eventLog = [];
 const MAX_EVENTS = 100;
+let myAgents = [];  // user's agents from API
+let activeTab = 'agents';
+
+// === CHECK FOR LEGACY ?key= AUTH ===
+(function checkLegacyKey() {
+  const params = new URLSearchParams(location.search);
+  const key = params.get('key');
+  if (key) {
+    isGodMode = true;
+    authToken = null;
+    document.getElementById('legacy-hint').style.display = 'block';
+    showApp();
+    connectWs();
+  }
+})();
+
+// === LOGIN / SIGNUP ===
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!username || !password) {
+    showLoginError('Username and password required');
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showLoginError(data.error || 'Login failed');
+      return;
+    }
+    authToken = data.token;
+    currentUser = data.user;
+    showApp();
+    connectWs();
+    fetchMyAgents();
+  } catch (e) {
+    showLoginError('Connection error');
+  }
+}
+
+async function doSignup() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!username || !password) {
+    showLoginError('Username and password required');
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showLoginError(data.error || 'Signup failed');
+      return;
+    }
+    authToken = data.token;
+    currentUser = data.user;
+    showApp();
+    connectWs();
+    fetchMyAgents();
+  } catch (e) {
+    showLoginError('Connection error');
+  }
+}
+
+async function doLogout() {
+  if (authToken) {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + authToken },
+      });
+    } catch {}
+  }
+  authToken = null;
+  currentUser = null;
+  isGodMode = false;
+  if (ws) ws.close();
+  showLogin();
+}
+
+function showLoginError(msg) {
+  document.getElementById('login-error').textContent = msg;
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  if (currentUser) {
+    document.getElementById('display-username').textContent = currentUser.username;
+    if (currentUser.is_admin) {
+      document.getElementById('admin-badge').style.display = '';
+    }
+  } else if (isGodMode) {
+    document.getElementById('display-username').textContent = 'admin (legacy)';
+    document.getElementById('admin-badge').style.display = '';
+  }
+  resizeCanvas();
+  requestAnimationFrame(render);
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-password').value = '';
+}
+
+// === PASSWORD ENTER KEY ===
+document.getElementById('login-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('login-username').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('login-password').focus();
+});
+
+// === AGENT API ===
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (authToken) h['Authorization'] = 'Bearer ' + authToken;
+  return h;
+}
+
+async function fetchMyAgents() {
+  if (!authToken) return;
+  try {
+    const res = await fetch('/api/agents', { headers: authHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      myAgents = Array.isArray(data) ? data : [];
+      updateAgentList();
+      updateCostPanel();
+      updateApiKeyStatus();
+    }
+  } catch {}
+}
+
+async function spawnAgent() {
+  const name = document.getElementById('spawn-name').value.trim();
+  const role = document.getElementById('spawn-role').value;
+  const msgEl = document.getElementById('spawn-msg');
+
+  if (!name) {
+    msgEl.textContent = 'Name is required';
+    msgEl.className = 'error';
+    return;
+  }
+
+  document.getElementById('spawn-btn').disabled = true;
+  msgEl.textContent = 'Creating...';
+  msgEl.className = '';
+
+  try {
+    // Step 1: create agent
+    const createRes = await fetch('/api/agents', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ name, role }),
+    });
+    const createData = await createRes.json();
+    if (!createRes.ok) {
+      msgEl.textContent = createData.error || 'Create failed';
+      msgEl.className = 'error';
+      document.getElementById('spawn-btn').disabled = false;
+      return;
+    }
+
+    // Step 2: start agent
+    const agentId = createData.agent.id;
+    const startRes = await fetch('/api/agents/' + agentId + '/start', {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    const startData = await startRes.json();
+    if (!startRes.ok) {
+      msgEl.textContent = 'Created but start failed: ' + (startData.error || '');
+      msgEl.className = 'error';
+    } else {
+      msgEl.textContent = 'Agent spawned!';
+      msgEl.className = 'success';
+      document.getElementById('spawn-name').value = '';
+    }
+
+    fetchMyAgents();
+  } catch (e) {
+    msgEl.textContent = 'Connection error';
+    msgEl.className = 'error';
+  }
+  document.getElementById('spawn-btn').disabled = false;
+}
+
+async function startAgent(agentId) {
+  try {
+    const res = await fetch('/api/agents/' + agentId + '/start', {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || 'Start failed');
+    }
+    fetchMyAgents();
+  } catch {}
+}
+
+async function stopAgent(agentId) {
+  try {
+    const res = await fetch('/api/agents/' + agentId + '/stop', {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || 'Stop failed');
+    }
+    fetchMyAgents();
+  } catch {}
+}
+
+async function deleteAgent(agentId) {
+  if (!confirm('Delete this agent? This cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/agents/' + agentId, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || 'Delete failed');
+    }
+    fetchMyAgents();
+  } catch {}
+}
+
+// === API KEY ===
+function updateApiKeyStatus() {
+  const el = document.getElementById('api-key-status');
+  if (!currentUser) {
+    el.innerHTML = '';
+    return;
+  }
+  if (currentUser.has_api_key) {
+    el.innerHTML = '<span class="set">API key is set</span>';
+  } else {
+    el.innerHTML = '<span class="not-set">No API key configured — agents cannot start without one</span>';
+  }
+}
+
+async function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const msgEl = document.getElementById('api-key-msg');
+  if (!key) {
+    msgEl.textContent = 'Enter an API key';
+    msgEl.className = 'error';
+    return;
+  }
+  try {
+    const res = await fetch('/api/user/settings', {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ api_key: key }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      msgEl.textContent = data.error || 'Failed to save';
+      msgEl.className = 'error';
+      return;
+    }
+    msgEl.textContent = 'API key saved';
+    msgEl.className = 'success';
+    document.getElementById('api-key-input').value = '';
+    if (currentUser) currentUser.has_api_key = true;
+    updateApiKeyStatus();
+  } catch {
+    msgEl.textContent = 'Connection error';
+    msgEl.className = 'error';
+  }
+}
+
+// === TABS ===
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-bar button').forEach(b => {
+    if (b.textContent.toLowerCase() === tab) b.classList.add('active');
+  });
+  document.getElementById('agents-panel').style.display = tab === 'agents' ? '' : 'none';
+  document.getElementById('cost-panel').style.display = tab === 'cost' ? '' : 'none';
+  document.getElementById('settings-panel').style.display = tab === 'settings' ? '' : 'none';
+  document.getElementById('spawn-form').style.display = tab === 'agents' && !isGodMode ? '' : 'none';
+}
+
+// === COST PANEL ===
+function updateCostPanel() {
+  const el = document.getElementById('cost-content');
+  if (!myAgents.length) {
+    el.innerHTML = '<div style="color:var(--text-secondary)">No agents yet</div>';
+    return;
+  }
+  let totalCost = 0;
+  let totalCalls = 0;
+  const perAgent = myAgents.map(a => {
+    totalCost += a.total_cost || 0;
+    totalCalls += a.total_llm_calls || 0;
+    return `<div class="cost-row"><span class="cost-label">${esc(a.agent_name)}</span><span class="cost-value">$${(a.total_cost || 0).toFixed(4)} (${a.total_llm_calls || 0} calls)</span></div>`;
+  });
+
+  el.innerHTML = [
+    `<div class="cost-row"><span class="cost-label">Total cost</span><span class="cost-value">$${totalCost.toFixed(4)}</span></div>`,
+    `<div class="cost-row"><span class="cost-label">Total LLM calls</span><span class="cost-value">${totalCalls}</span></div>`,
+    '<div class="cost-divider"></div>',
+    '<h3>PER AGENT</h3>',
+    ...perAgent,
+  ].join('');
+}
 
 // === CANVAS SETUP ===
 const canvas = document.getElementById('world-canvas');
@@ -331,13 +1067,13 @@ let scale = canvasSize / WORLD_SIZE;
 
 function resizeCanvas() {
   const panel = document.getElementById('map-panel');
+  if (!panel) return;
   const s = Math.min(panel.clientWidth, panel.clientHeight) - 8;
   canvasSize = Math.max(300, s);
   canvas.width = canvasSize;
   canvas.height = canvasSize;
   scale = canvasSize / WORLD_SIZE;
 }
-resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
 function worldToCanvas(x, y) {
@@ -436,12 +1172,9 @@ function render() {
     ctx.fillText(b.type, bx, by - pulse - 3);
   }
 
-  // combat lines — find fighting agents and draw line to their combat targets
-  // We draw red dashed lines between agents in 'fighting' status and nearby NPCs/agents also in fighting
-  // Simple heuristic: draw lines between all fighting pairs based on proximity
+  // combat lines
   const fightingAgents = state.agents.filter(a => a.status === 'fighting');
   for (const a of fightingAgents) {
-    // find closest fighting entity
     let closest = null;
     let closestDist = Infinity;
 
@@ -587,7 +1320,6 @@ canvas.addEventListener('mousemove', (e) => {
     tooltip.textContent = txt;
     tooltip.style.display = 'block';
 
-    // position tooltip near mouse within panel
     const panel = document.getElementById('map-panel');
     const pr = panel.getBoundingClientRect();
     let tx = e.clientX - pr.left + 12;
@@ -644,6 +1376,26 @@ function row(label, value) {
 function updateAgentList() {
   if (!state) return;
   const el = document.getElementById('agents-list');
+  const headerEl = document.getElementById('agents-header');
+
+  // Determine which agents to show and whether to show controls
+  const showControls = !isGodMode && currentUser;
+  const isAdmin = isGodMode || (currentUser && currentUser.is_admin);
+
+  // Build set of user's owned agent names for matching with world agents
+  const ownedAgentNames = new Set(myAgents.map(a => a.agent_name));
+  const ownedAgentMap = {};
+  for (const a of myAgents) {
+    ownedAgentMap[a.agent_name] = a;
+  }
+
+  if (isAdmin) {
+    headerEl.textContent = 'ALL AGENTS';
+  } else if (currentUser) {
+    const count = myAgents.length;
+    const max = currentUser.max_agents;
+    headerEl.textContent = `MY AGENTS (${count}/${max})`;
+  }
 
   // sort: fighters, merchants, monsters
   const order = { fighter: 0, merchant: 1, monster: 2 };
@@ -654,7 +1406,7 @@ function updateAgentList() {
     const sel = selectedAgentId === a.id ? ' selected' : '';
     const hpBar = buildHealthBar(a.health, a.maxHealth);
     const posStr = `(${Math.round(a.position.x)}, ${Math.round(a.position.y)})`;
-    const destStr = a.destination ? ` → (${Math.round(a.destination.x)}, ${Math.round(a.destination.y)})` : '';
+    const destStr = a.destination ? ` \u2192 (${Math.round(a.destination.x)}, ${Math.round(a.destination.y)})` : '';
     const allianceStr = a.alliance ? `\n  Alliance: ${esc(a.alliance)}` : '';
     const equipParts = [];
     if (a.equipment.weapon) equipParts.push(esc(a.equipment.weapon));
@@ -666,6 +1418,32 @@ function updateAgentList() {
     const escapedId = esc(a.id);
     const escapedName = esc(a.name);
 
+    // Show controls if this is the user's agent
+    const dbAgent = ownedAgentMap[a.name];
+    let controlsHtml = '';
+    if (showControls && dbAgent) {
+      const agentDbId = esc(dbAgent.id);
+      if (dbAgent.status === 'running') {
+        controlsHtml = `<div class="agent-controls"><button onclick="event.stopPropagation();stopAgent('${agentDbId}')">Stop</button></div>`;
+      } else {
+        controlsHtml = `<div class="agent-controls"><button onclick="event.stopPropagation();startAgent('${agentDbId}')">Start</button><button class="danger" onclick="event.stopPropagation();deleteAgent('${agentDbId}')">Delete</button></div>`;
+      }
+    } else if (isAdmin && !isGodMode && dbAgent) {
+      // Admin also gets controls for all agents
+      const agentDbId = esc(dbAgent.id);
+      if (dbAgent.status === 'running') {
+        controlsHtml = `<div class="agent-controls"><button onclick="event.stopPropagation();stopAgent('${agentDbId}')">Stop</button></div>`;
+      } else {
+        controlsHtml = `<div class="agent-controls"><button onclick="event.stopPropagation();startAgent('${agentDbId}')">Start</button><button class="danger" onclick="event.stopPropagation();deleteAgent('${agentDbId}')">Delete</button></div>`;
+      }
+    }
+
+    // Cost info if available
+    let costStr = '';
+    if (dbAgent && dbAgent.total_cost > 0) {
+      costStr = `\n  Cost: $${dbAgent.total_cost.toFixed(4)} (${dbAgent.total_llm_calls} calls)`;
+    }
+
     return `<div class="agent-card${sel}" data-id="${escapedId}" onclick="selectAgent('${escapedId}')">
   <div class="agent-header">
     <span class="agent-name" style="color:${color}">${escapedName}${connIcon}</span>
@@ -675,10 +1453,34 @@ function updateAgentList() {
     HP: ${hpBar} ${Math.round(a.health)}/${a.maxHealth}
     ATK: ${a.attack}  DEF: ${a.defense}  SPD: ${a.speed}
     Gold: ${Math.round(a.gold)}${monsterStr}
-    Pos: ${posStr}${destStr}${allianceStr}${equipStr}
+    Pos: ${posStr}${destStr}${allianceStr}${equipStr}${costStr}
   </div>
+  ${controlsHtml}
 </div>`;
   }).join('');
+
+  // Show stopped agents that aren't in the world yet
+  if (showControls) {
+    const worldAgentNames = new Set(state.agents.map(a => a.name));
+    const stoppedAgents = myAgents.filter(a => !worldAgentNames.has(a.agent_name));
+    for (const a of stoppedAgents) {
+      const agentDbId = esc(a.id);
+      const roleColor = ROLE_COLORS[a.agent_role] || '#fff';
+      el.innerHTML += `<div class="agent-card">
+  <div class="agent-header">
+    <span class="agent-name" style="color:${roleColor}">${esc(a.agent_name)}</span>
+    <span class="agent-status" style="color:#555">[${esc(a.status.toUpperCase())}]</span>
+  </div>
+  <div class="agent-details" style="color:var(--text-secondary)">
+    Role: ${esc(a.agent_role)}${a.total_cost > 0 ? `  Cost: $${a.total_cost.toFixed(4)}` : ''}
+  </div>
+  <div class="agent-controls">
+    <button onclick="event.stopPropagation();startAgent('${agentDbId}')">Start</button>
+    <button class="danger" onclick="event.stopPropagation();deleteAgent('${agentDbId}')">Delete</button>
+  </div>
+</div>`;
+    }
+  }
 }
 
 function selectAgent(id) {
@@ -779,16 +1581,30 @@ function truncate(str, len) {
 
 // === WEBSOCKET ===
 let ws = null;
+let agentPollInterval = null;
 
-function connect() {
+function connectWs() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const params = new URLSearchParams(location.search);
-  const key = params.get('key') || '';
-  ws = new WebSocket(`${proto}://${location.host}/ws?key=${encodeURIComponent(key)}`);
+  let wsUrl;
+
+  if (isGodMode) {
+    const params = new URLSearchParams(location.search);
+    const key = params.get('key') || '';
+    wsUrl = `${proto}://${location.host}/ws?key=${encodeURIComponent(key)}`;
+  } else {
+    wsUrl = `${proto}://${location.host}/ws?token=${encodeURIComponent(authToken)}`;
+  }
+
+  ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
     document.getElementById('conn-dot').classList.add('connected');
     document.getElementById('conn-label').textContent = 'connected';
+    // Poll agents periodically to keep controls in sync
+    if (!isGodMode && authToken) {
+      if (agentPollInterval) clearInterval(agentPollInterval);
+      agentPollInterval = setInterval(fetchMyAgents, 10000);
+    }
   };
 
   ws.onmessage = (event) => {
@@ -805,7 +1621,14 @@ function connect() {
   ws.onclose = () => {
     document.getElementById('conn-dot').classList.remove('connected');
     document.getElementById('conn-label').textContent = 'disconnected';
-    setTimeout(connect, 2000);
+    if (agentPollInterval) {
+      clearInterval(agentPollInterval);
+      agentPollInterval = null;
+    }
+    // Only reconnect if we still have auth
+    if (authToken || isGodMode) {
+      setTimeout(connectWs, 2000);
+    }
   };
 
   ws.onerror = () => {
@@ -813,8 +1636,11 @@ function connect() {
   };
 }
 
-connect();
-requestAnimationFrame(render);
+// Hide spawn form for god-mode
+if (isGodMode) {
+  const sf = document.getElementById('spawn-form');
+  if (sf) sf.style.display = 'none';
+}
 </script>
 </body>
 </html>
