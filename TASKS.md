@@ -29,7 +29,7 @@
 ---
 
 ### TASK-A02: Salience Gate + Drives
-- **Status:** READY
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Depends on:** A01
