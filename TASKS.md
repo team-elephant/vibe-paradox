@@ -212,7 +212,7 @@
 ---
 
 ### TASK-B03: Dashboard UI — Login + Agent Controls
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** B
 - **Depends on:** B02

@@ -20,7 +20,7 @@ import { MonsterProcessor } from '../pipeline/monster-processor.js';
 import { BehemothProcessor } from '../pipeline/behemoth-processor.js';
 import { AdminServer } from './admin.js';
 import { UsersDatabase } from './users-db.js';
-import { AuthRouter } from './auth.js';
+import { AuthRouter, type AuthenticatedRequest } from './auth.js';
 import { AgentApiRouter } from './agent-api.js';
 import { AgentSpawner } from './spawner.js';
 
@@ -163,6 +163,9 @@ adminServer.setApiHandler(async (req, res) => {
   if (await authRouter.handleRequest(req, res)) return true;
   if (await agentApiRouter.handleRequest(req, res)) return true;
   return false;
+});
+adminServer.setTokenAuthenticator(async (token) => {
+  return authRouter.authenticate({ headers: { authorization: `Bearer ${token}` } } as AuthenticatedRequest);
 });
 
 // 7. Start tick loop
