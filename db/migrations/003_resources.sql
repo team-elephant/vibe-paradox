@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS resources (
   created_at INTEGER NOT NULL
 );
 
-CREATE INDEX idx_resources_position ON resources(position_x, position_y);
-CREATE INDEX idx_resources_type ON resources(type);
+CREATE INDEX IF NOT EXISTS idx_resources_position ON resources(position_x, position_y);
+CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);

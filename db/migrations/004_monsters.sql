@@ -32,5 +32,5 @@ CREATE TABLE IF NOT EXISTS behemoths (
   route TEXT NOT NULL DEFAULT '[]'
 );
 
-CREATE INDEX idx_npc_monsters_position ON npc_monsters(position_x, position_y);
-CREATE INDEX idx_behemoths_position ON behemoths(position_x, position_y);
+CREATE INDEX IF NOT EXISTS idx_npc_monsters_position ON npc_monsters(position_x, position_y);
+CREATE INDEX IF NOT EXISTS idx_behemoths_position ON behemoths(position_x, position_y);

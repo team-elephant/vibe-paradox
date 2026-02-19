@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at INTEGER NOT NULL
 );
 
-CREATE INDEX idx_messages_tick ON messages(tick);
+CREATE INDEX IF NOT EXISTS idx_messages_tick ON messages(tick);

@@ -29,6 +29,6 @@ CREATE TABLE IF NOT EXISTS agents (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_agents_position ON agents(position_x, position_y);
-CREATE INDEX idx_agents_alliance ON agents(alliance);
-CREATE INDEX idx_agents_role ON agents(role);
+CREATE INDEX IF NOT EXISTS idx_agents_position ON agents(position_x, position_y);
+CREATE INDEX IF NOT EXISTS idx_agents_alliance ON agents(alliance);
+CREATE INDEX IF NOT EXISTS idx_agents_role ON agents(role);
