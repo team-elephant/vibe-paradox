@@ -910,7 +910,7 @@ async function spawnAgent() {
     }
 
     // Step 2: start agent
-    const agentId = createData.agent.id;
+    const agentId = createData.id;
     const startRes = await fetch('/api/agents/' + agentId + '/start', {
       method: 'POST',
       headers: authHeaders(),
