@@ -6,7 +6,6 @@
 // Most ticks → EXECUTE_PLAN (zero LLM cost).
 // LLM only called on INTERRUPT, PLAN_COMPLETE, or PLAN_EMPTY.
 
-import Anthropic from '@anthropic-ai/sdk';
 import type { TickUpdateData } from '../src/types/index.js';
 import type { AgentConfig } from './config.js';
 
@@ -18,6 +17,7 @@ import { route } from './pipeline/router.js';
 import { generatePlan, PlannerCooldown, type LlmCreateFn } from './pipeline/planner.js';
 import { PipelineMemory } from './pipeline/memory.js';
 import { PlanExecutor } from './plan-executor.js';
+import { createPlannerLlm, createReflectionLlmWithUsage, type LlmConfig } from './llm.js';
 
 export interface BrainAction {
   action: string;
@@ -27,12 +27,32 @@ export interface BrainAction {
 
 // --- Cost Tracking ---
 
-const COST_PER_MTOK = {
-  input: 0.80,    // Haiku pricing (default model for v2)
-  output: 4.0,
-  cacheRead: 0.08,
-  cacheWrite: 1.0,
-} as const;
+interface CostRates {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+// Per-million-token pricing by model family (OpenRouter pricing)
+const MODEL_PRICING: Record<string, CostRates> = {
+  haiku: { input: 0.80, output: 4.0, cacheRead: 0.08, cacheWrite: 1.0 },
+  sonnet: { input: 3.0, output: 15.0, cacheRead: 0.30, cacheWrite: 3.75 },
+  opus: { input: 15.0, output: 75.0, cacheRead: 1.50, cacheWrite: 18.75 },
+  'gemini-flash': { input: 0.10, output: 0.40, cacheRead: 0, cacheWrite: 0 },
+  deepseek: { input: 0.14, output: 0.28, cacheRead: 0, cacheWrite: 0 },
+  llama: { input: 0.30, output: 0.40, cacheRead: 0, cacheWrite: 0 },
+};
+
+function getCostRates(model: string): CostRates {
+  const lower = model.toLowerCase();
+  if (lower.includes('opus')) return MODEL_PRICING.opus;
+  if (lower.includes('sonnet')) return MODEL_PRICING.sonnet;
+  if (lower.includes('gemini') && lower.includes('flash')) return MODEL_PRICING['gemini-flash'];
+  if (lower.includes('deepseek')) return MODEL_PRICING.deepseek;
+  if (lower.includes('llama')) return MODEL_PRICING.llama;
+  return MODEL_PRICING.haiku; // Default fallback
+}
 
 const COST_LOG_INTERVAL_PLANS = 20;
 
@@ -46,12 +66,12 @@ interface UsageTotals {
   executePlanTicks: number;
 }
 
-function estimateCost(t: UsageTotals): number {
+function estimateCost(t: UsageTotals, rates: CostRates): number {
   return (
-    (t.inputTokens / 1_000_000) * COST_PER_MTOK.input +
-    (t.outputTokens / 1_000_000) * COST_PER_MTOK.output +
-    (t.cacheReadTokens / 1_000_000) * COST_PER_MTOK.cacheRead +
-    (t.cacheWriteTokens / 1_000_000) * COST_PER_MTOK.cacheWrite
+    (t.inputTokens / 1_000_000) * rates.input +
+    (t.outputTokens / 1_000_000) * rates.output +
+    (t.cacheReadTokens / 1_000_000) * rates.cacheRead +
+    (t.cacheWriteTokens / 1_000_000) * rates.cacheWrite
   );
 }
 
@@ -60,7 +80,7 @@ function formatNum(n: number): string {
 }
 
 // Global registry so exit handler can log all agents
-const activeAgents = new Map<string, { name: string; usage: UsageTotals }>();
+const activeAgents = new Map<string, { name: string; model: string; provider: string; usage: UsageTotals }>();
 let exitHandlerRegistered = false;
 
 function registerExitHandler(): void {
@@ -72,13 +92,14 @@ function registerExitHandler(): void {
     process.stderr.write('\n=== Pipeline Brain v2 — Cost Summary ===\n');
     let grandTotal = 0;
     for (const [, agent] of activeAgents) {
-      const cost = estimateCost(agent.usage);
+      const cost = estimateCost(agent.usage, getCostRates(agent.model));
       grandTotal += cost;
       const ratio = agent.usage.tickCount > 0
         ? ((agent.usage.executePlanTicks / agent.usage.tickCount) * 100).toFixed(1)
         : '0.0';
       process.stderr.write(
-        `[${agent.name}] ${agent.usage.planCount} plans / ${agent.usage.tickCount} ticks (${ratio}% free) | ` +
+        `[${agent.name}] model: ${agent.model} (${agent.provider}) | ` +
+        `${agent.usage.planCount} plans / ${agent.usage.tickCount} ticks (${ratio}% free) | ` +
         `input: ${formatNum(agent.usage.inputTokens)} | ` +
         `output: ${formatNum(agent.usage.outputTokens)} | ` +
         `cache: ${formatNum(agent.usage.cacheReadTokens)} read / ${formatNum(agent.usage.cacheWriteTokens)} write | ` +
@@ -107,8 +128,8 @@ function registerExitHandler(): void {
 // --- Pipeline Brain ---
 
 export class AgentBrain {
-  private client: Anthropic;
   private config: AgentConfig;
+  private llmConfig: LlmConfig;
   private sendAction: (action: BrainAction) => void;
 
   // Pipeline state
@@ -141,24 +162,27 @@ export class AgentBrain {
   constructor(config: AgentConfig, sendAction: (action: BrainAction) => void) {
     this.config = config;
     this.sendAction = sendAction;
-    this.client = new Anthropic({ apiKey: config.apiKey });
+    this.llmConfig = {
+      provider: config.llmProvider,
+      apiKey: config.apiKey,
+      model: config.model,
+    };
     this.memory = new PipelineMemory();
     this.executor = new PlanExecutor();
     this.cooldown = new PlannerCooldown(3);
 
     // Register for cost tracking on exit
-    activeAgents.set(config.name, { name: config.name, usage: this.usage });
+    activeAgents.set(config.name, {
+      name: config.name,
+      model: config.model,
+      provider: config.llmProvider,
+      usage: this.usage,
+    });
     registerExitHandler();
   }
 
   async onTickUpdate(update: TickUpdateData): Promise<void> {
     this.usage.tickCount++;
-
-    // Dead agents don't act
-    if (update.self.health <= 0) {
-      this.prevState = update;
-      return;
-    }
 
     // Don't stack LLM calls
     if (this.planInFlight) {
@@ -182,6 +206,14 @@ export class AgentBrain {
     this.updateDrivesContext(update, perceptions);
     this.drives = updateDrives(this.drives, update, perceptions, this.drivesContext);
 
+    // Dead agents: run perception + drives (above) so death is tracked, but don't act
+    if (update.self.health <= 0) {
+      this.memory.logPerceptions(perceptions, update.tick);
+      this.executor.clearPlan();
+      this.prevState = update;
+      return;
+    }
+
     // --- Stage 6 (early): Log perceptions to memory ---
     this.memory.logPerceptions(perceptions, update.tick);
 
@@ -200,6 +232,21 @@ export class AgentBrain {
     switch (decision.type) {
       case 'EXECUTE_PLAN': {
         this.usage.executePlanTicks++;
+
+        // P0 fix: consume step completion/failure perceptions to advance the executor
+        const stepCompleted = perceptions.some((p) => p.type === 'plan_step_completed');
+        const stepFailed = perceptions.find((p) => p.type === 'plan_step_failed');
+        if (stepCompleted) {
+          this.memory.logPlanOutcome('completed', 'step completed', update.tick);
+          this.executor.advanceStep();
+        } else if (stepFailed) {
+          const reason = (stepFailed.details.reason as string) ?? 'unknown';
+          this.memory.logPlanOutcome('failed', `step failed: ${reason}`, update.tick);
+          this.executor.advanceStep();
+        }
+
+        // If advancing exhausted the plan, the next tick's router will catch PLAN_COMPLETE.
+        // For now, execute the (possibly new) current step.
         const action = this.executor.getNextAction(update);
         if (action) {
           this.sendAction({
@@ -207,8 +254,8 @@ export class AgentBrain {
             params: action.params,
             tick: update.tick,
           });
-        } else {
-          // Plan step returned null (e.g., no valid target) — advance to next step
+        } else if (!this.executor.isPlanComplete()) {
+          // Step returned null (e.g., no valid target) — advance past it
           this.executor.advanceStep();
           this.memory.logPlanOutcome('failed', 'step returned no valid action', update.tick);
         }
@@ -260,35 +307,15 @@ export class AgentBrain {
   private async generateNewPlan(update: TickUpdateData, interruptReason: string | null): Promise<void> {
     const now = Date.now();
     if (!this.cooldown.canPlan(now)) {
-      // Rate limited — idle instead
+      // Rate limited — clear stale plan so router doesn't resume it, then idle
+      this.executor.clearPlan();
       this.sendAction({ action: 'idle', params: {}, tick: update.tick });
       return;
     }
 
     this.planInFlight = true;
     try {
-      const llmCall: LlmCreateFn = async (params) => {
-        const response = await this.client.messages.create({
-          model: params.model,
-          max_tokens: params.maxTokens,
-          temperature: params.temperature,
-          system: [{ type: 'text', text: params.system, cache_control: { type: 'ephemeral' } }],
-          messages: [{ role: 'user', content: params.user }],
-        });
-
-        const text = response.content
-          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-          .map((b) => b.text)
-          .join('');
-
-        return {
-          text,
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-          cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
-          cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
-        };
-      };
+      const llmCall = createPlannerLlm(this.llmConfig);
 
       const result = await generatePlan(
         {
@@ -319,10 +346,11 @@ export class AgentBrain {
 
       // Log cost every N plans
       if (this.usage.planCount % COST_LOG_INTERVAL_PLANS === 0) {
-        const cost = estimateCost(this.usage);
+        const cost = estimateCost(this.usage, getCostRates(this.config.model));
         const ratio = ((this.usage.executePlanTicks / this.usage.tickCount) * 100).toFixed(1);
         process.stderr.write(
           `[${this.config.name}] ${this.usage.planCount} plans / ${this.usage.tickCount} ticks (${ratio}% free) | ` +
+          `model: ${this.config.model} (${this.llmConfig.provider}) | ` +
           `est cost: $${cost.toFixed(4)}\n`,
         );
       }
@@ -352,26 +380,18 @@ export class AgentBrain {
 
   private async doReflection(): Promise<void> {
     try {
-      const llmCall = async (prompt: string): Promise<string> => {
-        const response = await this.client.messages.create({
-          model: this.config.model,
-          max_tokens: 150,
-          temperature: 0.7,
-          messages: [{ role: 'user', content: prompt }],
-        });
+      const reflectionLlm = createReflectionLlmWithUsage(this.llmConfig);
 
-        const text = response.content
-          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-          .map((b) => b.text)
-          .join('');
+      const llmCall = async (prompt: string): Promise<string> => {
+        const result = await reflectionLlm(prompt);
 
         // Track reflection cost
-        this.usage.inputTokens += response.usage.input_tokens;
-        this.usage.outputTokens += response.usage.output_tokens;
-        this.usage.cacheReadTokens += response.usage.cache_read_input_tokens ?? 0;
-        this.usage.cacheWriteTokens += response.usage.cache_creation_input_tokens ?? 0;
+        this.usage.inputTokens += result.inputTokens;
+        this.usage.outputTokens += result.outputTokens;
+        this.usage.cacheReadTokens += result.cacheReadTokens;
+        this.usage.cacheWriteTokens += result.cacheWriteTokens;
 
-        return text;
+        return result.text;
       };
 
       await this.memory.reflect(llmCall);

@@ -254,6 +254,25 @@
 
 ---
 
+### TASK-A07: Code Review Fixes — Brain Pipeline Bugs
+- **Status:** IN_PROGRESS
+- **Priority:** High
+- **Track:** A
+- **Depends on:** A05
+- **Description:** Fix 5 bugs found during code review of the pipeline brain. P0: step advancement never fires on successful completion. P1: interrupted plan resumes after cooldown blocks replanning. P2: self-death skipped. P2: malformed move defaults to (0,0). P3: cost telemetry uses wrong pricing.
+- **Scope (files you MAY touch):**
+  - `agent/brain.ts` (modify)
+  - `agent/plan-executor.ts` (modify)
+- **Definition of done:**
+  - Plans advance steps on plan_step_completed / plan_step_failed perceptions
+  - Interrupted plans are cleared when cooldown blocks replanning
+  - Self-death runs perception + drives update before early return
+  - Malformed move steps return null (trigger replan) instead of move(0,0)
+  - Cost pricing is model-aware, not hardcoded to Haiku
+  - `npx vitest run && npx tsc --noEmit` passes
+
+---
+
 ## BACKLOG (Future)
 
 ### TASK-C01: Agent Brain v3 — Alliance Formation

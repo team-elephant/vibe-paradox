@@ -1,6 +1,7 @@
 // agent/config.ts — AgentConfig interface + defaults + env var loading
 
 import type { AgentRole } from '../src/types/index.js';
+import type { LlmProvider } from './llm.js';
 
 export interface AgentConfig {
   // Connection
@@ -13,6 +14,7 @@ export interface AgentConfig {
   model: string;
   maxTokens: number;
   temperature: number;
+  llmProvider: LlmProvider;
 
   // Decision tuning
   idleTimeout: number;           // ticks without action before forcing a decision
@@ -22,7 +24,7 @@ export interface AgentConfig {
 }
 
 const DEFAULTS = {
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'anthropic/claude-haiku-4-5-20251001',
   maxTokens: 200,
   temperature: 0.7,
   idleTimeout: 5,
@@ -36,9 +38,23 @@ export function loadConfig(overrides: {
   name: string;
   role: AgentRole;
 }): AgentConfig {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const llmProvider = (process.env.LLM_PROVIDER ?? 'openrouter') as LlmProvider;
+
+  // Pick the right API key based on provider
+  let apiKey: string;
+  if (llmProvider === 'openrouter') {
+    apiKey = process.env.OPENROUTER_API_KEY ?? '';
+    if (!apiKey) {
+      // Fall back to ANTHROPIC_API_KEY if set (user may have it configured)
+      apiKey = process.env.ANTHROPIC_API_KEY ?? '';
+    }
+  } else {
+    apiKey = process.env.ANTHROPIC_API_KEY ?? '';
+  }
+
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is required');
+    const keyName = llmProvider === 'openrouter' ? 'OPENROUTER_API_KEY' : 'ANTHROPIC_API_KEY';
+    throw new Error(`${keyName} environment variable is required (LLM_PROVIDER=${llmProvider})`);
   }
 
   return {
@@ -46,6 +62,7 @@ export function loadConfig(overrides: {
     name: overrides.name,
     role: overrides.role,
     apiKey,
+    llmProvider,
     model: process.env.VIBE_PARADOX_MODEL ?? DEFAULTS.model,
     maxTokens: DEFAULTS.maxTokens,
     temperature: DEFAULTS.temperature,

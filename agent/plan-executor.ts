@@ -112,9 +112,12 @@ function translateStep(step: PlanStep, state: TickUpdateData): GameAction | null
   }
 }
 
-function translateMove(step: PlanStep): GameAction {
-  const x = (step.params.x as number) ?? 0;
-  const y = (step.params.y as number) ?? 0;
+function translateMove(step: PlanStep): GameAction | null {
+  const x = step.params.x as number | undefined;
+  const y = step.params.y as number | undefined;
+  if (x === undefined || y === undefined || typeof x !== 'number' || typeof y !== 'number') {
+    return null; // Malformed move — caller will advance past this step
+  }
   return { action: 'move', params: { x, y } };
 }
 
