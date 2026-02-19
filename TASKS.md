@@ -53,7 +53,7 @@
 ---
 
 ### TASK-A03: Router + Plan Executor
-- **Status:** BACKLOG
+- **Status:** DONE (2026-02-19)
 - **Priority:** High
 - **Track:** A
 - **Depends on:** A02
