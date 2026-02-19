@@ -95,12 +95,15 @@ function resolveDashboardPath(): string {
   return '';
 }
 
+export type ApiHandler = (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
+
 export class AdminServer {
   private httpServer: HttpServer;
   private wss: WebSocketServer;
   private dashboardHtml: string;
   private adminClients: Set<WebSocket> = new Set();
   private adminKey: string;
+  private apiHandler: ApiHandler | null = null;
 
   constructor(port: number) {
     // Generate auth key
@@ -144,6 +147,10 @@ export class AdminServer {
     return this.adminKey;
   }
 
+  setApiHandler(handler: ApiHandler): void {
+    this.apiHandler = handler;
+  }
+
   private checkKey(urlStr: string): boolean {
     try {
       const url = new URL(urlStr, 'http://localhost');
@@ -153,8 +160,14 @@ export class AdminServer {
     }
   }
 
-  private handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
-    const urlPath = (req.url || '').split('?')[0];
+  private async handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const urlPath = (req.url || '').split('?')[0]!;
+
+    // Delegate /api/* routes to external handler (auth, agent management, etc.)
+    if (urlPath.startsWith('/api/') && this.apiHandler) {
+      const handled = await this.apiHandler(req, res);
+      if (handled) return;
+    }
 
     if (urlPath === '/' || urlPath === '/index.html') {
       // Check auth key

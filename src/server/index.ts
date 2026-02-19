@@ -19,6 +19,8 @@ import { EconomyProcessor } from '../pipeline/economy-processor.js';
 import { MonsterProcessor } from '../pipeline/monster-processor.js';
 import { BehemothProcessor } from '../pipeline/behemoth-processor.js';
 import { AdminServer } from './admin.js';
+import { UsersDatabase } from './users-db.js';
+import { AuthRouter } from './auth.js';
 
 // --- CLI arg parsing (simple, no commander needed for server) ---
 
@@ -149,6 +151,11 @@ tickLoop.setBroadcaster(broadcaster, wsServer);
 const adminServer = new AdminServer(adminPort);
 tickLoop.setAdminServer(adminServer);
 
+// 6c. Initialize user accounts database and auth
+const usersDb = new UsersDatabase('admin.db');
+const authRouter = new AuthRouter(usersDb);
+adminServer.setApiHandler((req, res) => authRouter.handleRequest(req, res));
+
 // 7. Start tick loop
 tickLoop.start();
 console.log(`[VP] Server started on ws://localhost:${port}`);
@@ -199,9 +206,10 @@ function shutdown(signal: string): void {
   adminServer.close();
   console.log('[VP] Admin server closed.');
 
-  // 5. Close database
+  // 5. Close databases
   db.close();
-  console.log('[VP] Database closed.');
+  usersDb.close();
+  console.log('[VP] Databases closed.');
 
   console.log('[VP] Shutdown complete.');
   process.exit(0);
